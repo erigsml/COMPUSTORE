@@ -98,8 +98,9 @@ export default function Home() {
                                 <Image
                                     src="/Collage_Products.webp"
                                     alt="Collage de productos COMPUSTORE - Toners, OPC Drums, Chips y más"
-                                    width={800}
-                                    height={800}
+                                    width={1600}
+                                    height={1600}
+                                    quality={95}
                                     className="w-full h-auto object-contain drop-shadow-2xl"
                                     priority
                                 />
