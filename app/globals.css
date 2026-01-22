@@ -56,4 +56,14 @@
   .animate-bounce-gentle {
     animation: bounce-gentle 2s ease-in-out infinite;
   }
+
+  /* Hide scrollbar for carousel */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
