@@ -112,7 +112,7 @@ export default function ChatWidget() {
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-4">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 z-[60] flex flex-col items-end gap-4">
             {/* Engagement Tooltip */}
             {!isOpen && (
                 <div
@@ -128,15 +128,17 @@ export default function ChatWidget() {
 
             {/* Widget Container */}
             {isOpen && (
-                <div className="mb-2 w-80 md:w-96 bg-white rounded-lg shadow-2xl overflow-hidden animate-fade-in-up border border-gray-100 origin-bottom-right flex flex-col" style={{ maxHeight: '600px', height: view === 'chat' ? '500px' : 'auto' }}>
+                <div className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 origin-bottom-right flex flex-col" style={{ maxHeight: '600px', height: view === 'chat' ? '500px' : 'auto' }}>
 
                     {/* HEADER */}
-                    <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0">
+                    <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0 rounded-t-lg">
                         <div className="flex items-center gap-2">
                             {view === 'chat' ? (
                                 <button
                                     onClick={() => setView('menu')}
                                     className="hover:bg-white/20 rounded-full p-1 mr-1 transition-colors"
+                                    aria-label="Volver al menú"
+                                    type="button"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="m15 18-6-6 6-6" />
@@ -155,8 +157,9 @@ export default function ChatWidget() {
                             onClick={() => setIsOpen(false)}
                             className="hover:bg-white/20 rounded-full p-1 transition-colors"
                             aria-label="Cerrar chat"
+                            type="button"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M18 6 6 18" />
                                 <path d="m6 6 12 12" />
                             </svg>
@@ -165,7 +168,7 @@ export default function ChatWidget() {
 
                     {/* CONTENT */}
                     {view === 'menu' ? (
-                        <>
+                        <div className="rounded-b-lg overflow-hidden">
                             {/* Subheader */}
                             <div className="p-4 bg-gray-50 border-b border-gray-100">
                                 <p className="text-gray-600 text-sm">
@@ -209,10 +212,10 @@ export default function ChatWidget() {
                                     </div>
                                 </button>
                             </div>
-                        </>
+                        </div>
                     ) : (
                         /* CHAT INTERFACE */
-                        <div className="flex flex-col h-full bg-gray-50">
+                        <div className="flex flex-col h-full bg-gray-50 overflow-hidden rounded-b-lg">
                             {/* Messages Area */}
                             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                                 {messages.map((msg) => (
