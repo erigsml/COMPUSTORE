@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 
@@ -108,29 +106,6 @@ export default function Home() {
                             </div>
                         </div>
 
-                    </div>
-                </div>
-
-                {/* Scroll Indicator - Bottom Center */}
-                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 animate-bounce-gentle">
-                    <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => {
-                        document.getElementById('productos')?.scrollIntoView({ behavior: 'smooth' });
-                    }}>
-                        <span className="text-gray-400 text-sm font-medium">Desliza</span>
-                        <svg
-                            className="w-6 h-6 text-compustore-red"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            aria-label="Deslizar hacia abajo"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                            />
-                        </svg>
                     </div>
                 </div>
             </section>
@@ -328,3 +303,4 @@ function ProductCard({
         </div>
     );
 }
+
