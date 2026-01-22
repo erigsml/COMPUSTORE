@@ -129,42 +129,42 @@ export default function Home() {
                         <ProductCard
                             title="Toners"
                             description="Cartuchos de tóner de alta calidad para todas las marcas principales. Rendimiento superior y durabilidad garantizada."
-                            icon="🖨️"
+                            imageSrc="/images/products/toners.jpg"
                         />
 
                         {/* Product Card 2 - Paper Pick Up Rollers */}
                         <ProductCard
                             title="Paper Pick Up Rollers"
                             description="Rodillos de alimentación de papel de precisión. Reduce atascos y mejora la eficiencia operativa."
-                            icon="📄"
+                            imageSrc="/images/products/pickup-rollers.png"
                         />
 
                         {/* Product Card 3 - OPC Drums */}
                         <ProductCard
                             title="OPC Drums"
                             description="Tambores fotoconductores de larga duración. Calidad de impresión excepcional y consistente."
-                            icon="🔄"
+                            imageSrc="/images/products/opc-drums.png"
                         />
 
                         {/* Product Card 4 - Chips de Impresoras */}
                         <ProductCard
                             title="Chips de Impresoras"
                             description="Chips compatibles para cartuchos de tóner. Solución económica sin comprometer la calidad."
-                            icon="💾"
+                            imageSrc="/images/products/printer-chips.jpg"
                         />
 
                         {/* Product Card 5 - Soluciones de Software */}
                         <ProductCard
                             title="Soluciones de Software"
                             description="Software de gestión de impresión avanzado. Optimiza costos y mejora la productividad."
-                            icon="💻"
+                            imageSrc="/images/products/software-solutions.jpg"
                         />
 
                         {/* Product Card 6 - Mantenimiento */}
                         <ProductCard
                             title="Kits de Mantenimiento"
                             description="Kits completos para mantenimiento preventivo. Extiende la vida útil de tus impresoras."
-                            icon="🔧"
+                            imageSrc="/images/products/maintenance-kits.jpg"
                         />
                     </div>
                 </div>
@@ -182,27 +182,63 @@ export default function Home() {
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-4xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
                         {/* Fuji Electric */}
-                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-10 text-center hover:border-compustore-red hover:shadow-2xl transition-all duration-300 group">
-                            <div className="mb-6 text-6xl">🏭</div>
+                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 text-center hover:border-compustore-red hover:shadow-2xl transition-all duration-300 group flex flex-col items-center">
+                            <div className="mb-6 h-16 w-full flex items-center justify-center relative">
+                                <Image
+                                    src="/images/logos/fuji-electric-logo.png"
+                                    alt="Fuji Electric Logo"
+                                    width={200}
+                                    height={80}
+                                    className="h-full w-auto object-contain"
+                                />
+                            </div>
                             <h3 className="text-2xl font-bold text-gray-900 mb-3">Fuji Electric</h3>
                             <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
                                 Aliado de Fábrica
                             </p>
-                            <p className="text-gray-600">
+                            <p className="text-gray-600 text-sm lg:text-base">
                                 Socios directos con Fuji Electric para garantizar la mejor calidad en componentes originales de impresión.
                             </p>
                         </div>
 
+                        {/* Tomoegawa */}
+                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 text-center hover:border-compustore-red hover:shadow-2xl transition-all duration-300 group flex flex-col items-center">
+                            <div className="mb-6 h-16 w-full flex items-center justify-center relative">
+                                <Image
+                                    src="/images/logos/tomoegawa-logo.png"
+                                    alt="Tomoegawa Logo"
+                                    width={200}
+                                    height={80}
+                                    className="h-full w-auto object-contain"
+                                />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-3">Tomoegawa</h3>
+                            <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
+                                Especialistas en Toner
+                            </p>
+                            <p className="text-gray-600 text-sm lg:text-base">
+                                Líderes mundiales en la fabricación de toner de alta precisión y reveladores para una impresión impecable.
+                            </p>
+                        </div>
+
                         {/* MyQ Solution */}
-                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-10 text-center hover:border-compustore-red hover:shadow-2xl transition-all duration-300 group">
-                            <div className="mb-6 text-6xl">💼</div>
+                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 text-center hover:border-compustore-red hover:shadow-2xl transition-all duration-300 group flex flex-col items-center">
+                            <div className="mb-6 h-16 w-full flex items-center justify-center relative">
+                                <Image
+                                    src="/images/logos/myq-logo.png"
+                                    alt="MyQ Solution Logo"
+                                    width={200}
+                                    height={80}
+                                    className="h-full w-auto object-contain"
+                                />
+                            </div>
                             <h3 className="text-2xl font-bold text-gray-900 mb-3">MyQ Solution</h3>
                             <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
                                 Partner de Software
                             </p>
-                            <p className="text-gray-600">
+                            <p className="text-gray-600 text-sm lg:text-base">
                                 Partnership certificado con MyQ para ofrecer las soluciones más avanzadas en gestión de impresión.
                             </p>
                         </div>
@@ -269,15 +305,16 @@ export default function Home() {
     );
 }
 
-// Product Card Component
 function ProductCard({
     title,
     description,
-    icon
+    icon,
+    imageSrc
 }: {
     title: string;
     description: string;
-    icon: string;
+    icon?: string;
+    imageSrc?: string;
 }) {
     return (
         <div
@@ -285,8 +322,21 @@ function ProductCard({
             role="article"
             aria-label={`Producto: ${title}`}
         >
-            <div className="text-5xl mb-6 group-hover:scale-110 transition-transform duration-300">
-                {icon}
+            <div className="mb-6 flex items-center justify-center">
+                {imageSrc ? (
+                    <div className="relative h-48 w-full group-hover:scale-110 transition-transform duration-300">
+                        <Image
+                            src={imageSrc}
+                            alt={title}
+                            fill
+                            className="object-contain"
+                        />
+                    </div>
+                ) : (
+                    <div className="text-5xl group-hover:scale-110 transition-transform duration-300">
+                        {icon}
+                    </div>
+                )}
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-compustore-red transition-colors">
                 {title}
