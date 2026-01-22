@@ -157,7 +157,7 @@ export default function Home() {
                         <ProductCard
                             title="Soluciones de Software"
                             description="Software de gestión de impresión avanzado. Optimiza costos y mejora la productividad."
-                            imageSrc="/images/products/software-solutions.jpg"
+                            imageSrc="/images/products/software-solutions.png"
                         />
 
                         {/* Product Card 6 - Mantenimiento */}
@@ -194,7 +194,7 @@ export default function Home() {
                                     className="h-full w-auto object-contain"
                                 />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-3">Fuji Electric</h3>
+                            {/*<h3 className="text-2xl font-bold text-gray-900 mb-3">Fuji Electric</h3>*/}
                             <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
                                 Aliado de Fábrica
                             </p>
@@ -209,12 +209,12 @@ export default function Home() {
                                 <Image
                                     src="/images/logos/tomoegawa-logo.png"
                                     alt="Tomoegawa Logo"
-                                    width={200}
-                                    height={80}
+                                    width={400}
+                                    height={160}
                                     className="h-full w-auto object-contain"
                                 />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-3">Tomoegawa</h3>
+                            {/*<h3 className="text-2xl font-bold text-gray-900 mb-3">Tomoegawa</h3>*/}
                             <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
                                 Especialistas en Toner
                             </p>
@@ -234,7 +234,7 @@ export default function Home() {
                                     className="h-full w-auto object-contain"
                                 />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-3">MyQ Solution</h3>
+                            {/*<h3 className="text-2xl font-bold text-gray-900 mb-3">MyQ Solution</h3>*/}
                             <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
                                 Partner de Software
                             </p>
@@ -318,7 +318,7 @@ function ProductCard({
 }) {
     return (
         <div
-            className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-compustore-red group cursor-pointer"
+            className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-compustore-red group cursor-pointer flex flex-col h-full"
             role="article"
             aria-label={`Producto: ${title}`}
         >
@@ -341,7 +341,7 @@ function ProductCard({
             <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-compustore-red transition-colors">
                 {title}
             </h3>
-            <p className="text-gray-600 leading-relaxed">
+            <p className="text-gray-600 leading-relaxed flex-grow">
                 {description}
             </p>
             <button
