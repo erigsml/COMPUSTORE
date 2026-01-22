@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 
@@ -49,29 +51,86 @@ export default function Home() {
             </header>
 
             {/* Hero Section */}
-            <section className="container mx-auto px-6 lg:px-8 py-20 lg:py-32">
-                <div className="max-w-5xl mx-auto text-center">
-                    <h1 className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-                        Soluciones de Impresión{" "}
-                        <span className="text-compustore-red">Directas de Fábrica</span>
-                    </h1>
-                    <p className="text-xl lg:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto font-light">
-                        Comercialización de partes críticas de impresión y soluciones de software.
-                        Calidad garantizada, precios competitivos.
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <button
-                            className="bg-compustore-red text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-red-700 transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto"
-                            aria-label="Ver catálogo de productos"
+            <section className="relative overflow-hidden">
+                {/* Modern Gradient Background */}
+                <div className="absolute inset-0 bg-gradient-radial from-white via-slate-50/30 to-slate-100/50"></div>
+
+                {/* Subtle Dot Pattern Overlay */}
+                <div
+                    className="absolute inset-0 opacity-[0.04]"
+                    style={{
+                        backgroundImage: `radial-gradient(circle, #CB1B20 1px, transparent 1px)`,
+                        backgroundSize: '30px 30px'
+                    }}
+                ></div>
+
+                {/* Content Container */}
+                <div className="container mx-auto px-6 lg:px-8 py-12 lg:py-20 relative z-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center max-w-7xl mx-auto">
+
+                        {/* Left Column - Text Content */}
+                        <div className="text-center lg:text-left flex flex-col items-center lg:items-start">
+                            <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+                                Soluciones de Impresión{" "}
+                                <span className="text-compustore-red">Directas de Fábrica</span>
+                            </h1>
+                            <p className="text-base lg:text-lg text-gray-600 mb-12 max-w-xl font-light">
+                                Comercialización de partes críticas de impresión y soluciones de software.
+                                Calidad garantizada, precios competitivos.
+                            </p>
+                            <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4 w-full sm:w-auto">
+                                <button
+                                    className="bg-compustore-red text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-red-700 transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto"
+                                    aria-label="Ver catálogo de productos"
+                                >
+                                    Ver Catálogo
+                                </button>
+                                <button
+                                    className="bg-white text-compustore-red border-2 border-compustore-red px-8 py-4 rounded-lg font-semibold text-lg hover:bg-compustore-red hover:text-white transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto"
+                                    aria-label="Solicitar cotización"
+                                >
+                                    Cotizar Ahora
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Right Column - Product Collage Image */}
+                        <div className="flex items-center justify-center lg:justify-end">
+                            <div className="relative w-full max-w-2xl animate-float">
+                                <Image
+                                    src="/Collage_Products.webp"
+                                    alt="Collage de productos COMPUSTORE - Toners, OPC Drums, Chips y más"
+                                    width={800}
+                                    height={800}
+                                    className="w-full h-auto object-contain drop-shadow-2xl"
+                                    priority
+                                />
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                {/* Scroll Indicator - Bottom Center */}
+                <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 animate-bounce-gentle">
+                    <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => {
+                        document.getElementById('productos')?.scrollIntoView({ behavior: 'smooth' });
+                    }}>
+                        <span className="text-gray-400 text-sm font-medium">Desliza</span>
+                        <svg
+                            className="w-6 h-6 text-compustore-red"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            aria-label="Deslizar hacia abajo"
                         >
-                            Ver Catálogo
-                        </button>
-                        <button
-                            className="bg-white text-compustore-red border-2 border-compustore-red px-8 py-4 rounded-lg font-semibold text-lg hover:bg-compustore-red hover:text-white transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto"
-                            aria-label="Solicitar cotización"
-                        >
-                            Cotizar Ahora
-                        </button>
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                            />
+                        </svg>
                     </div>
                 </div>
             </section>

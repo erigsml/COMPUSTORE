@@ -17,6 +17,9 @@ export default {
             fontFamily: {
                 sans: ['Inter', 'system-ui', 'sans-serif'],
             },
+            backgroundImage: {
+                'gradient-radial': 'radial-gradient(circle at center left, var(--tw-gradient-stops))',
+            },
         },
     },
     plugins: [],
