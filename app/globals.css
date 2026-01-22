@@ -8,4 +8,15 @@
   body {
     @apply font-sans antialiased;
   }
+
+  /* Custom text selection color - COMPUSTORE red */
+  ::selection {
+    background-color: #CB1B20;
+    color: #FFFFFF;
+  }
+
+  ::-moz-selection {
+    background-color: #CB1B20;
+    color: #FFFFFF;
+  }
 }

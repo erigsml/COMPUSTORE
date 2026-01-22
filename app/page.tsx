@@ -8,16 +8,20 @@ export default function Home() {
             <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
                 <nav className="container mx-auto px-6 lg:px-8 py-4">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center">
+                        <Link
+                            href="/"
+                            className="flex items-center transition-opacity hover:opacity-80"
+                            aria-label="Volver al inicio de COMPUSTORE"
+                        >
                             <Image
                                 src="/logo.svg"
                                 alt="COMPUSTORE Logo"
                                 width={200}
                                 height={40}
-                                className="h-10 w-auto"
+                                className="h-10 w-auto cursor-pointer"
                                 priority
                             />
-                        </div>
+                        </Link>
                         <div className="hidden md:flex items-center space-x-8">
                             <Link
                                 href="#productos"
