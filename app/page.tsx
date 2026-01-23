@@ -69,11 +69,11 @@ export default function Home() {
                         {/* Left Column - Text Content */}
                         <div className="text-center lg:text-left flex flex-col items-center lg:items-start">
                             <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-                                Soluciones de Impresión{" "}
-                                <span className="text-compustore-red">Directas de Fábrica</span>
+                                Suministros y Repuestos:{" "}
+                                <span className="text-compustore-red">Toners, Chips y Partes para Impresoras</span>
                             </h1>
                             <p className="text-base lg:text-lg text-gray-600 mb-12 max-w-xl font-light">
-                                Comercialización de partes críticas de impresión y soluciones de software.
+                                Partes críticas de impresión y soluciones de software MyQ para auditoría, control y reducción de costos.
                                 Calidad garantizada, precios competitivos.
                             </p>
                             <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4 w-full sm:w-auto">
@@ -98,9 +98,8 @@ export default function Home() {
                                 <Image
                                     src="/Collage_Products.webp"
                                     alt="Collage de productos COMPUSTORE - Toners, OPC Drums, Chips y más"
-                                    width={1600}
-                                    height={1600}
-                                    quality={95}
+                                    width={800}
+                                    height={800}
                                     className="w-full h-auto object-contain drop-shadow-2xl"
                                     priority
                                 />
@@ -130,6 +129,7 @@ export default function Home() {
                             title="Toners"
                             description="Cartuchos de tóner de alta calidad para todas las marcas principales. Rendimiento superior y durabilidad garantizada."
                             imageSrc="/images/products/toners.jpg"
+                            slug="toners"
                         />
 
                         {/* Product Card 2 - Paper Pick Up Rollers */}
@@ -137,6 +137,7 @@ export default function Home() {
                             title="Paper Pick Up Rollers"
                             description="Rodillos de alimentación de papel de precisión. Reduce atascos y mejora la eficiencia operativa."
                             imageSrc="/images/products/pickup-rollers.png"
+                            slug="pickup-rollers"
                         />
 
                         {/* Product Card 3 - OPC Drums */}
@@ -144,6 +145,7 @@ export default function Home() {
                             title="OPC Drums"
                             description="Tambores fotoconductores de larga duración. Calidad de impresión excepcional y consistente."
                             imageSrc="/images/products/opc-drums.png"
+                            slug="opc-drums"
                         />
 
                         {/* Product Card 4 - Chips de Impresoras */}
@@ -151,6 +153,7 @@ export default function Home() {
                             title="Chips de Impresoras"
                             description="Chips compatibles para cartuchos de tóner. Solución económica sin comprometer la calidad."
                             imageSrc="/images/products/printer-chips.jpg"
+                            slug="printer-chips"
                         />
 
                         {/* Product Card 5 - Soluciones de Software */}
@@ -158,6 +161,7 @@ export default function Home() {
                             title="Soluciones de Software"
                             description="Software de gestión de impresión avanzado. Optimiza costos y mejora la productividad."
                             imageSrc="/images/products/software-solutions.png"
+                            slug="software-solutions"
                         />
 
                         {/* Product Card 6 - Mantenimiento */}
@@ -165,6 +169,7 @@ export default function Home() {
                             title="Kits de Mantenimiento"
                             description="Kits completos para mantenimiento preventivo. Extiende la vida útil de tus impresoras."
                             imageSrc="/images/products/maintenance-kits.jpg"
+                            slug="maintenance-kits"
                         />
                     </div>
                 </div>
@@ -250,7 +255,7 @@ export default function Home() {
             <section className="bg-compustore-red py-20">
                 <div className="container mx-auto px-6 lg:px-8 text-center">
                     <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">
-                        ¿Listo para optimizar tu infraestructura de impresión?
+                        CompuStore, tu proveedor de confianza
                     </h2>
                     <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
                         Contáctanos hoy y descubre cómo nuestras soluciones pueden transformar tu operación
@@ -309,19 +314,17 @@ function ProductCard({
     title,
     description,
     icon,
-    imageSrc
+    imageSrc,
+    slug
 }: {
     title: string;
     description: string;
     icon?: string;
     imageSrc?: string;
+    slug?: string;
 }) {
-    return (
-        <div
-            className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-compustore-red group cursor-pointer flex flex-col h-full"
-            role="article"
-            aria-label={`Producto: ${title}`}
-        >
+    const content = (
+        <>
             <div className="mb-6 flex items-center justify-center">
                 {imageSrc ? (
                     <div className="relative h-48 w-full group-hover:scale-110 transition-transform duration-300">
@@ -344,13 +347,34 @@ function ProductCard({
             <p className="text-gray-600 leading-relaxed flex-grow">
                 {description}
             </p>
-            <button
-                className="mt-6 text-compustore-red font-semibold flex items-center group-hover:gap-2 transition-all"
-                aria-label={`Ver más sobre ${title}`}
-            >
+            <div className="mt-6 text-compustore-red font-semibold flex items-center group-hover:gap-2 transition-all">
                 Ver más
                 <span className="ml-1 group-hover:ml-2 transition-all">→</span>
-            </button>
+            </div>
+        </>
+    );
+
+    if (slug) {
+        return (
+            <Link href={`/productos/${slug}`}>
+                <div
+                    className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-compustore-red group cursor-pointer flex flex-col h-full"
+                    role="article"
+                    aria-label={`Producto: ${title}`}
+                >
+                    {content}
+                </div>
+            </Link>
+        );
+    }
+
+    return (
+        <div
+            className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-compustore-red group cursor-pointer flex flex-col h-full"
+            role="article"
+            aria-label={`Producto: ${title}`}
+        >
+            {content}
         </div>
     );
 }
