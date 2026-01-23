@@ -11,6 +11,7 @@ interface ProductType {
 interface Brand {
     name: string;
     logo: string;
+    color?: string;
 }
 
 interface CategoryData {
@@ -21,13 +22,13 @@ interface CategoryData {
 }
 
 export const allBrandSVGs: Brand[] = [
-    { name: "HP", logo: "/images/brands/hp-2.svg" },
-    { name: "Canon", logo: "/images/brands/canon-office-prod.svg" },
-    { name: "Lexmark", logo: "/images/brands/lexmark-3.svg" },
-    { name: "Xerox", logo: "/images/brands/xerox-9.svg" },
-    { name: "Kyocera", logo: "/images/brands/Kyocera_print.svg" },
-    { name: "Konica Minolta", logo: "/images/brands/Konica_Minolta_(Print).svg" },
-    { name: "Ricoh", logo: "/images/brands/WEB-Logos-RICOH-1-1024x410-convertido-de-png.svg" },
+    { name: "HP", logo: "/images/brands/hp-5.svg", color: "#0096D6" },
+    { name: "Canon", logo: "/images/brands/canon-wordmark-1.svg", color: "#E21E26" },
+    { name: "Lexmark", logo: "/images/brands/lexmark-2015.svg", color: "#00A651" },
+    { name: "Xerox", logo: "/images/brands/xerox-logo-1.svg", color: "#FF001F" },
+    { name: "Kyocera", logo: "/images/brands/kyocera-logo.svg", color: "#E4002B" },
+    { name: "Konica Minolta", logo: "/images/brands/Logo_Konica_Minolta.svg", color: "#005CAF" },
+    { name: "Ricoh", logo: "/images/brands/ricoh-business-solutions.svg", color: "#CE1126" },
 ];
 
 export const productCategories: Record<string, CategoryData> = {

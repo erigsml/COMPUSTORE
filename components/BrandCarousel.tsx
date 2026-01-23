@@ -20,21 +20,22 @@ export default function BrandCarousel({ brands = allBrandSVGs }: { brands?: any[
 
             <div className="flex w-max animate-scroll">
                 {duplicateBrands.map((brand, index) => {
-                    // Normalizar el peso visual de los logos más pequeños o horizontales
-                    const isSmallLogo = brand.name === "Xerox" || brand.name === "Kyocera";
+                    // Compensar tamaño para logos visualmente más pequeños
+                    const isSmallLogo = ["Xerox", "Kyocera", "Canon"].includes(brand.name);
+                    const logoHeight = isSmallLogo ? "h-14" : "h-12";
 
                     return (
                         <div
                             key={index}
                             className="flex-shrink-0 px-8 transition-transform duration-300 hover:scale-110 flex items-center justify-center h-20"
-                            style={{ width: '220px' }} // Un poco más de espacio para que no se vean amontonados
+                            style={{ width: '220px' }}
                         >
                             <Image
                                 src={brand.logo}
                                 alt={`${brand.name} Logo`}
                                 width={180}
-                                height={90}
-                                className={`${isSmallLogo ? 'h-16' : 'h-11'} w-auto object-contain pointer-events-none transition-all`}
+                                height={80}
+                                className={`${logoHeight} w-auto object-contain pointer-events-none transition-all`}
                                 draggable={false}
                             />
                         </div>

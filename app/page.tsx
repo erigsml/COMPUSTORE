@@ -65,7 +65,7 @@ export default function Home() {
                 ></div>
 
                 {/* Content Container */}
-                <div className="container mx-auto px-6 lg:px-8 py-12 lg:py-20 relative z-10">
+                <div className="container mx-auto px-6 lg:px-8 py-8 lg:py-12 relative z-10">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center max-w-7xl mx-auto">
 
                         {/* Left Column - Text Content */}
