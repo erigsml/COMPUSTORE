@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import HeroCarousel from "@/components/HeroCarousel";
+import BrandCarousel from "@/components/BrandCarousel";
 
 export default function Home() {
     return (
@@ -92,18 +94,9 @@ export default function Home() {
                             </div>
                         </div>
 
-                        {/* Right Column - Product Collage Image */}
+                        {/* Right Column - Hero Carousel */}
                         <div className="flex items-center justify-center lg:justify-end">
-                            <div className="relative w-full max-w-2xl animate-float">
-                                <Image
-                                    src="/Collage_Products.webp"
-                                    alt="Collage de productos COMPUSTORE - Toners, OPC Drums, Chips y más"
-                                    width={800}
-                                    height={800}
-                                    className="w-full h-auto object-contain drop-shadow-2xl"
-                                    priority
-                                />
-                            </div>
+                            <HeroCarousel />
                         </div>
 
                     </div>
@@ -144,7 +137,7 @@ export default function Home() {
                         <ProductCard
                             title="OPC Drums"
                             description="Tambores fotoconductores de larga duración. Calidad de impresión excepcional y consistente."
-                            imageSrc="/images/products/opc-drums.png"
+                            imageSrc="/images/products/opc-drums-v2.png"
                             slug="opc-drums"
                         />
 
@@ -171,6 +164,16 @@ export default function Home() {
                             imageSrc="/images/products/maintenance-kits.jpg"
                             slug="maintenance-kits"
                         />
+                    </div>
+
+                    <div className="mt-20">
+                        <div className="text-center mb-8">
+                            <h3 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
+                                Marcas que Confían en Nosotros
+                            </h3>
+                            <div className="w-20 h-1 bg-compustore-red mx-auto rounded-full"></div>
+                        </div>
+                        <BrandCarousel />
                     </div>
                 </div>
             </section>

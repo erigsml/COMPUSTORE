@@ -20,19 +20,21 @@ interface CategoryData {
     types?: ProductType[];
 }
 
+export const allBrandSVGs: Brand[] = [
+    { name: "HP", logo: "/images/brands/hp-2.svg" },
+    { name: "Canon", logo: "/images/brands/canon-office-prod.svg" },
+    { name: "Lexmark", logo: "/images/brands/lexmark-3.svg" },
+    { name: "Xerox", logo: "/images/brands/xerox-9.svg" },
+    { name: "Kyocera", logo: "/images/brands/Kyocera_print.svg" },
+    { name: "Konica Minolta", logo: "/images/brands/Konica_Minolta_(Print).svg" },
+    { name: "Ricoh", logo: "/images/brands/WEB-Logos-RICOH-1-1024x410-convertido-de-png.svg" },
+];
+
 export const productCategories: Record<string, CategoryData> = {
     toners: {
         title: "Toners",
         description: "Cartuchos de tóner de alta calidad para todas las marcas principales",
-        brands: [
-            { name: "HP", logo: "/images/brands/hp-2.svg" },
-            { name: "Canon", logo: "/images/brands/canon-office-prod.svg" },
-            { name: "Epson", logo: "/images/brands/epson-1.svg" },
-            { name: "Brother", logo: "/images/brands/brother-1.svg" },
-            { name: "Samsung", logo: "/images/brands/samsung-8.svg" },
-            { name: "Xerox", logo: "/images/brands/xerox-9.svg" },
-            { name: "Lexmark", logo: "/images/brands/lexmark-3.svg" },
-        ],
+        brands: [...allBrandSVGs],
     },
     "pickup-rollers": {
         title: "Paper Pick Up Rollers",
@@ -79,41 +81,17 @@ export const productCategories: Record<string, CategoryData> = {
                 description: "Conjunto de rodillos y/o almohadillas que permite realizar mantenimiento completo del sistema de alimentación de papel."
             }
         ],
-        brands: [
-            { name: "HP", logo: "/images/brands/hp-2.svg" },
-            { name: "Canon", logo: "/images/brands/canon-office-prod.svg" },
-            { name: "Epson", logo: "/images/brands/epson-1.svg" },
-            { name: "Brother", logo: "/images/brands/brother-1.svg" },
-            { name: "Samsung", logo: "/images/brands/samsung-8.svg" },
-            { name: "Xerox", logo: "/images/brands/xerox-9.svg" },
-            { name: "Lexmark", logo: "/images/brands/lexmark-3.svg" },
-        ],
+        brands: [...allBrandSVGs],
     },
     "opc-drums": {
         title: "OPC Drums",
         description: "Tambores fotoconductores de larga duración",
-        brands: [
-            { name: "HP", logo: "/images/brands/hp-2.svg" },
-            { name: "Canon", logo: "/images/brands/canon-office-prod.svg" },
-            { name: "Epson", logo: "/images/brands/epson-1.svg" },
-            { name: "Brother", logo: "/images/brands/brother-1.svg" },
-            { name: "Samsung", logo: "/images/brands/samsung-8.svg" },
-            { name: "Xerox", logo: "/images/brands/xerox-9.svg" },
-            { name: "Lexmark", logo: "/images/brands/lexmark-3.svg" },
-        ],
+        brands: [...allBrandSVGs],
     },
     "printer-chips": {
         title: "Chips de Impresoras",
         description: "Chips compatibles para cartuchos de tóner",
-        brands: [
-            { name: "HP", logo: "/images/brands/hp-2.svg" },
-            { name: "Canon", logo: "/images/brands/canon-office-prod.svg" },
-            { name: "Epson", logo: "/images/brands/epson-1.svg" },
-            { name: "Brother", logo: "/images/brands/brother-1.svg" },
-            { name: "Samsung", logo: "/images/brands/samsung-8.svg" },
-            { name: "Xerox", logo: "/images/brands/xerox-9.svg" },
-            { name: "Lexmark", logo: "/images/brands/lexmark-3.svg" },
-        ],
+        brands: [...allBrandSVGs],
     },
     "software-solutions": {
         title: "Soluciones de Software",
@@ -125,15 +103,7 @@ export const productCategories: Record<string, CategoryData> = {
     "maintenance-kits": {
         title: "Kits de Mantenimiento",
         description: "Kits completos para mantenimiento preventivo",
-        brands: [
-            { name: "HP", logo: "/images/brands/hp-2.svg" },
-            { name: "Canon", logo: "/images/brands/canon-office-prod.svg" },
-            { name: "Epson", logo: "/images/brands/epson-1.svg" },
-            { name: "Brother", logo: "/images/brands/brother-1.svg" },
-            { name: "Samsung", logo: "/images/brands/samsung-8.svg" },
-            { name: "Xerox", logo: "/images/brands/xerox-9.svg" },
-            { name: "Lexmark", logo: "/images/brands/lexmark-3.svg" },
-        ],
+        brands: [...allBrandSVGs],
     },
 };
 
