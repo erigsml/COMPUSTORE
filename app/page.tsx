@@ -169,7 +169,7 @@ export default function Home() {
                     <div className="mt-20">
                         <div className="text-center mb-8">
                             <h3 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
-                                Marcas que Confían en Nosotros
+                                Marcas con las que Trabajamos
                             </h3>
                             <div className="w-20 h-1 bg-compustore-red mx-auto rounded-full"></div>
                         </div>

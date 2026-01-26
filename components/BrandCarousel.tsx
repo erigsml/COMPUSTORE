@@ -18,7 +18,7 @@ export default function BrandCarousel({ brands = allBrandSVGs }: { brands?: any[
             <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none"></div>
             <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none"></div>
 
-            <div className="flex w-max animate-scroll">
+            <div className="flex w-max animate-scroll hover:[animation-play-state:paused]">
                 {duplicateBrands.map((brand, index) => {
                     // Compensar tamaño para logos visualmente más pequeños
                     const isSmallLogo = ["Xerox", "Kyocera", "Canon"].includes(brand.name);
@@ -27,7 +27,7 @@ export default function BrandCarousel({ brands = allBrandSVGs }: { brands?: any[
                     return (
                         <div
                             key={index}
-                            className="flex-shrink-0 px-8 transition-transform duration-300 hover:scale-110 flex items-center justify-center h-20"
+                            className="flex-shrink-0 px-8 flex items-center justify-center h-20"
                             style={{ width: '220px' }}
                         >
                             <Image
