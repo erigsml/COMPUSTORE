@@ -5,7 +5,7 @@ import Image from "next/image";
 
 const images = [
     {
-        src: "/images/products/toners.jpg",
+        src: "/images/products/tonersVerticales.webp",
         alt: "Toners de alta calidad"
     },
     {
@@ -13,15 +13,15 @@ const images = [
         alt: "Rodillos de alimentación"
     },
     {
-        src: "/images/products/opc-drums-v2.png",
+        src: "/images/products/OPCDrums.webp",
         alt: "Tambores OPC"
     },
     {
-        src: "/images/products/printer-chips.jpg",
+        src: "/images/products/ChipsImpresoras.webp",
         alt: "Chips para impresoras"
     },
     {
-        src: "/images/products/software-solutions.png",
+        src: "/images/products/software-solutions.webp",
         alt: "Soluciones de software MyQ"
     },
     {

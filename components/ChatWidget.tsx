@@ -12,7 +12,7 @@ type Message = {
 export default function ChatWidget() {
     const [isOpen, setIsOpen] = useState(false);
     const [showTooltip, setShowTooltip] = useState(false);
-    const [view, setView] = useState<'menu' | 'chat'>('menu');
+    const [view, setView] = useState<'menu' | 'chat'>('chat');
 
     // Chat State
     const [messages, setMessages] = useState<Message[]>([
@@ -128,29 +128,16 @@ export default function ChatWidget() {
 
             {/* Widget Container */}
             {isOpen && (
-                <div className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 origin-bottom-right flex flex-col" style={{ maxHeight: '600px', height: view === 'chat' ? '500px' : 'auto' }}>
+                <div className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 origin-bottom-right flex flex-col" style={{ maxHeight: '600px', height: '500px' }}>
 
                     {/* HEADER */}
                     <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0 rounded-t-lg">
                         <div className="flex items-center gap-2">
-                            {view === 'chat' ? (
-                                <button
-                                    onClick={() => setView('menu')}
-                                    className="hover:bg-white/20 rounded-full p-1 mr-1 transition-colors"
-                                    aria-label="Volver al menú"
-                                    type="button"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="m15 18-6-6 6-6" />
-                                    </svg>
-                                </button>
-                            ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-                                </svg>
-                            )}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+                            </svg>
                             <span className="font-semibold text-lg">
-                                {view === 'chat' ? 'Asistente Virtual' : 'Ayuda'}
+                                Asistente Virtual
                             </span>
                         </div>
                         <button
@@ -167,108 +154,60 @@ export default function ChatWidget() {
                     </div>
 
                     {/* CONTENT */}
-                    {view === 'menu' ? (
-                        <div className="rounded-b-lg overflow-hidden">
-                            {/* Subheader */}
-                            <div className="p-4 bg-gray-50 border-b border-gray-100">
-                                <p className="text-gray-600 text-sm">
-                                    Por favor elige una de las opciones:
-                                </p>
-                            </div>
-
-                            {/* Options */}
-                            <div className="p-4 space-y-3">
-                                {/* WhatsApp Option */}
-                                <button className="w-full bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-md transition-all hover:border-green-500 group text-left">
-                                    <div className="bg-green-100 rounded-full p-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-600">
-                                            <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
-                                            <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-gray-800 group-hover:text-green-600 transition-colors">Chatea por WhatsApp</h4>
-                                    </div>
-                                </button>
-
-                                {/* N8N Chatbot Option */}
-                                <button
-                                    onClick={() => setView('chat')}
-                                    className="w-full bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-md transition-all hover:border-[#1B8BCC] group text-left"
+                    {/* CHAT INTERFACE */}
+                    <div className="flex flex-col h-full bg-gray-50 overflow-hidden rounded-b-lg">
+                        {/* Messages Area */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                            {messages.map((msg) => (
+                                <div
+                                    key={msg.id}
+                                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
-                                    <div className="bg-blue-100 rounded-full p-2 relative overflow-hidden h-10 w-10 flex items-center justify-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#1B8BCC]">
-                                            <path d="M12 8V4H8" />
-                                            <rect width="16" height="12" x="4" y="8" rx="2" />
-                                            <path d="M2 14h2" />
-                                            <path d="M20 14h2" />
-                                            <path d="M15 13v2" />
-                                            <path d="M9 13v2" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-gray-800 group-hover:text-[#1B8BCC] transition-colors">¡Hola!</h4>
-                                        <p className="text-sm text-gray-500">¿En qué puedo ayudarte?</p>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        /* CHAT INTERFACE */
-                        <div className="flex flex-col h-full bg-gray-50 overflow-hidden rounded-b-lg">
-                            {/* Messages Area */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {messages.map((msg) => (
                                     <div
-                                        key={msg.id}
-                                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                        className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user'
+                                            ? 'bg-[#1B8BCC] text-white rounded-br-none'
+                                            : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
+                                            }`}
                                     >
-                                        <div
-                                            className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user'
-                                                ? 'bg-[#1B8BCC] text-white rounded-br-none'
-                                                : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
-                                                }`}
-                                        >
-                                            {msg.text}
-                                        </div>
+                                        {msg.text}
                                     </div>
-                                ))}
-                                {isLoading && (
-                                    <div className="flex justify-start">
-                                        <div className="bg-white p-3 rounded-2xl rounded-bl-none border border-gray-200 shadow-sm flex items-center gap-1">
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-.3s]"></div>
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-.5s]"></div>
-                                        </div>
+                                </div>
+                            ))}
+                            {isLoading && (
+                                <div className="flex justify-start">
+                                    <div className="bg-white p-3 rounded-2xl rounded-bl-none border border-gray-200 shadow-sm flex items-center gap-1">
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-.3s]"></div>
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-.5s]"></div>
                                     </div>
-                                )}
-                                <div ref={messagesEndRef} />
-                            </div>
-
-                            {/* Input Area */}
-                            <div className="p-3 bg-white border-t border-gray-200">
-                                <form onSubmit={handleSendMessage} className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={inputValue}
-                                        onChange={(e) => setInputValue(e.target.value)}
-                                        placeholder="Escribe tu mensaje..."
-                                        className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={isLoading || !inputValue.trim()}
-                                        className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="m22 2-7 20-4-9-9-4Z" />
-                                            <path d="M22 2 11 13" />
-                                        </svg>
-                                    </button>
-                                </form>
-                            </div>
+                                </div>
+                            )}
+                            <div ref={messagesEndRef} />
                         </div>
-                    )}
+
+                        {/* Input Area */}
+                        <div className="p-3 bg-white border-t border-gray-200">
+                            <form onSubmit={handleSendMessage} className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    placeholder="Escribe tu mensaje..."
+                                    className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isLoading || !inputValue.trim()}
+                                    className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="m22 2-7 20-4-9-9-4Z" />
+                                        <path d="M22 2 11 13" />
+                                    </svg>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             )}
 
