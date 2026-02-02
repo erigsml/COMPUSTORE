@@ -1,9 +1,26 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import HeroCarousel from "@/components/HeroCarousel";
 import BrandCarousel from "@/components/BrandCarousel";
+import ChatWidget from "@/components/ChatWidget";
 
 export default function Home() {
+    const [chatOpen, setChatOpen] = useState(false);
+
+    const handleScrollToProducts = () => {
+        const productsSection = document.getElementById('productos');
+        if (productsSection) {
+            productsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
+    const handleOpenChat = () => {
+        setChatOpen(true);
+    };
+
     return (
         <main className="min-h-screen bg-white">
             {/* Navigation Header */}
@@ -80,12 +97,14 @@ export default function Home() {
                             </p>
                             <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4 w-full sm:w-auto">
                                 <button
+                                    onClick={handleScrollToProducts}
                                     className="bg-compustore-red text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-red-700 transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto"
                                     aria-label="Ver catálogo de productos"
                                 >
                                     Ver Catálogo
                                 </button>
                                 <button
+                                    onClick={handleOpenChat}
                                     className="bg-white text-compustore-red border-2 border-compustore-red px-8 py-4 rounded-lg font-semibold text-lg hover:bg-compustore-red hover:text-white transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto"
                                     aria-label="Solicitar cotización"
                                 >
@@ -153,7 +172,7 @@ export default function Home() {
                         <ProductCard
                             title="Soluciones de Software"
                             description="Software de gestión de impresión avanzado. Optimiza costos y mejora la productividad."
-                            imageSrc="/images/products/software-solutions.png"
+                            imageSrc="/images/products/software-solutions.webp"
                             slug="software-solutions"
                         />
 
@@ -309,6 +328,9 @@ export default function Home() {
                     </div>
                 </div>
             </footer>
+
+            {/* ChatWidget with controlled state */}
+            <ChatWidget isOpen={chatOpen} setIsOpen={setChatOpen} />
         </main>
     );
 }

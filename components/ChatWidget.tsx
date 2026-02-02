@@ -9,10 +9,20 @@ type Message = {
     text: string;
 };
 
-export default function ChatWidget() {
-    const [isOpen, setIsOpen] = useState(false);
+export default function ChatWidget({
+    isOpen: externalIsOpen,
+    setIsOpen: externalSetIsOpen
+}: {
+    isOpen?: boolean;
+    setIsOpen?: (value: boolean) => void;
+} = {}) {
+    const [internalIsOpen, setInternalIsOpen] = useState(false);
     const [showTooltip, setShowTooltip] = useState(false);
     const [view, setView] = useState<'menu' | 'chat'>('chat');
+
+    // Use external state if provided, otherwise use internal state
+    const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+    const setIsOpen = externalSetIsOpen || setInternalIsOpen;
 
     // Chat State
     const [messages, setMessages] = useState<Message[]>([
@@ -21,6 +31,11 @@ export default function ChatWidget() {
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [sessionId] = useState(() => Math.random().toString(36).substring(7)); // Simple session ID
+
+    // Message batching state
+    const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const BATCH_TIMEOUT = 3000; // 3 seconds to wait for more messages
 
     // Auto-scroll ref
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -48,28 +63,29 @@ export default function ChatWidget() {
         return () => clearInterval(interval);
     }, [isOpen]);
 
-    const handleSendMessage = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-
-        if (!inputValue.trim() || isLoading) return;
-
-        const userText = inputValue.trim();
-        setInputValue("");
-
-        // Add user message
-        const userMsg: Message = {
-            id: Date.now().toString(),
-            role: 'user',
-            text: userText
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
         };
-        setMessages(prev => [...prev, userMsg]);
+    }, []);
+
+    // Function to send all pending messages to the AI
+    const sendBatchedMessages = async (messagesToSend: Message[]) => {
+        if (messagesToSend.length === 0 || isLoading) return;
+
         setIsLoading(true);
 
         try {
+            // Combine all pending messages into one request
+            const combinedMessage = messagesToSend.map(msg => msg.text).join('\n\n');
+
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: userText, sessionId })
+                body: JSON.stringify({ message: combinedMessage, sessionId })
             });
 
             if (!response.ok) throw new Error('Error de conexión');
@@ -109,6 +125,44 @@ export default function ChatWidget() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleSendMessage = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+
+        if (!inputValue.trim() || isLoading) return;
+
+        const userText = inputValue.trim();
+        setInputValue("");
+
+        // Create user message
+        const userMsg: Message = {
+            id: Date.now().toString(),
+            role: 'user',
+            text: userText
+        };
+
+        // Add to UI immediately
+        setMessages(prev => [...prev, userMsg]);
+
+        // Add to pending messages queue
+        setPendingMessages(prev => [...prev, userMsg]);
+
+        // Clear existing timeout if any
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+        }
+
+        // Set new timeout to send batched messages
+        timeoutRef.current = setTimeout(() => {
+            // Get current pending messages and clear the queue immediately
+            setPendingMessages(currentPending => {
+                if (currentPending.length > 0) {
+                    sendBatchedMessages(currentPending);
+                }
+                return []; // Clear the queue
+            });
+        }, BATCH_TIMEOUT);
     };
 
     return (
