@@ -82,10 +82,10 @@ export default function ChatWidget({
             // Combine all pending messages into one request
             const combinedMessage = messagesToSend.map(msg => msg.text).join('\n\n');
 
-            const response = await fetch('/api/chat', {
+            const response = await fetch('https://n8n.mediclick.us/webhook/chatbot', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: combinedMessage, sessionId })
+                body: JSON.stringify({ chatInput: combinedMessage, sessionId })
             });
 
             if (!response.ok) throw new Error('Error de conexión');
