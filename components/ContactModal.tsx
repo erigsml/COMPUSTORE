@@ -87,9 +87,23 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
 
         setIsSubmitting(true);
 
-        // Simulate API call
-        setTimeout(() => {
-            setIsSubmitting(false);
+        try {
+            // Usando el script PHP en lugar de la API de Next.js
+            const response = await fetch('/contact.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData),
+            });
+
+            // PHP devuelve texto o JSON, intentamos parsear
+            const result = await response.json();
+
+            if (!response.ok || (result.status && result.status === 'error')) {
+                throw new Error(result.message || 'Error al enviar el mensaje');
+            }
+
             setSubmitStatus('success');
             setTimeout(() => {
                 setSubmitStatus('idle');
@@ -97,7 +111,15 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
                 setFormData({ name: '', email: '', phone: '', message: '' });
                 setErrors({ email: '', phone: '', name: '', message: '' });
             }, 2000);
-        }, 1500);
+        } catch (error) {
+            console.error('Error:', error);
+            setSubmitStatus('error');
+            setTimeout(() => {
+                setSubmitStatus('idle');
+            }, 3000);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -201,6 +223,16 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
                             </div>
                             <h4 className="text-xl font-bold text-gray-900 mb-2">¡Mensaje Enviado!</h4>
                             <p className="text-gray-600">Gracias por contactarnos. Te responderemos a la brevedad.</p>
+                        </div>
+                    ) : submitStatus === 'error' ? (
+                        <div className="text-center py-8">
+                            <div className="mx-auto w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </div>
+                            <h4 className="text-xl font-bold text-gray-900 mb-2">Error al enviar</h4>
+                            <p className="text-gray-600">Hubo un problema al enviar tu mensaje. Por favor intenta de nuevo.</p>
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
