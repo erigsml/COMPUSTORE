@@ -188,7 +188,7 @@ export default function Home() {
                     <div className="mt-20">
                         <div className="text-center mb-8">
                             <h3 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
-                                Marcas con las que Trabajamos
+                                Marcas con las que trabajamos
                             </h3>
                             <div className="w-20 h-1 bg-compustore-red mx-auto rounded-full"></div>
                         </div>
@@ -202,14 +202,34 @@ export default function Home() {
                 <div className="container mx-auto px-6 lg:px-8">
                     <div className="text-center mb-16">
                         <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-                            Aliados Estratégicos
+                            Aliados estratégicos
                         </h2>
                         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
                             Trabajamos con los mejores socios para ofrecerte las soluciones más confiables del mercado
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-7xl mx-auto">
+                        {/* KIOT*/}
+                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 text-center hover:border-compustore-red hover:shadow-2xl transition-all duration-300 group flex flex-col items-center">
+                            <div className="mb-6 h-20 w-full flex items-center justify-center relative">
+                                <Image
+                                    src="/images/logos/kiot_logo.png"
+                                    alt="Kiot Logo"
+                                    width={400}
+                                    height={400}
+                                    className="h-full w-auto object-contain"
+                                />
+                            </div>
+                            {/*<h3 className="text-2xl font-bold text-gray-900 mb-3">Fuji Electric</h3>*/}
+                            <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
+                                Especialista en tintas y toners
+                            </p>
+                            <p className="text-gray-600 text-sm lg:text-base">
+                                Líderes en la distribución de tintas y toners para impresoras.
+                            </p>
+                        </div>
+
                         {/* Fuji Electric */}
                         <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 text-center hover:border-compustore-red hover:shadow-2xl transition-all duration-300 group flex flex-col items-center">
                             <div className="mb-6 h-16 w-full flex items-center justify-center relative">
@@ -223,7 +243,7 @@ export default function Home() {
                             </div>
                             {/*<h3 className="text-2xl font-bold text-gray-900 mb-3">Fuji Electric</h3>*/}
                             <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
-                                Aliado de Fábrica
+                                Aliado de fábrica
                             </p>
                             <p className="text-gray-600 text-sm lg:text-base">
                                 Socios directos con Fuji Electric para garantizar la mejor calidad en componentes originales de impresión.
@@ -243,7 +263,7 @@ export default function Home() {
                             </div>
                             {/*<h3 className="text-2xl font-bold text-gray-900 mb-3">Tomoegawa</h3>*/}
                             <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
-                                Especialistas en Toner
+                                Especialistas en toner
                             </p>
                             <p className="text-gray-600 text-sm lg:text-base">
                                 Líderes mundiales en la fabricación de toner de alta precisión y reveladores para una impresión impecable.
@@ -263,7 +283,7 @@ export default function Home() {
                             </div>
                             {/*<h3 className="text-2xl font-bold text-gray-900 mb-3">MyQ Solution</h3>*/}
                             <p className="text-gray-600 mb-2 font-semibold text-compustore-red">
-                                Partner de Software
+                                Partner de software
                             </p>
                             <p className="text-gray-600 text-sm lg:text-base">
                                 Partnership certificado con MyQ para ofrecer las soluciones más avanzadas en gestión de impresión.
