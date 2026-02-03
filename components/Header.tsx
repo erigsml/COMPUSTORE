@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import ContactButton from "./ContactButton";
 
 export default function Header() {
     const [isVisible, setIsVisible] = useState(true);
@@ -64,9 +65,9 @@ export default function Header() {
                         >
                             Aliados
                         </Link>
-                        <button className="bg-compustore-red text-white px-6 py-2.5 rounded-lg font-medium hover:bg-red-700 transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95">
+                        <ContactButton className="bg-compustore-red text-white px-6 py-2.5 rounded-lg font-medium hover:bg-red-700 transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95">
                             Contacto
-                        </button>
+                        </ContactButton>
                     </div>
                 </div>
             </nav>

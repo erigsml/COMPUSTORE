@@ -6,6 +6,7 @@ import Link from "next/link";
 import HeroCarousel from "@/components/HeroCarousel";
 import BrandCarousel from "@/components/BrandCarousel";
 import ChatWidget from "@/components/ChatWidget";
+import ContactButton from "@/components/ContactButton";
 
 export default function Home() {
     const [chatOpen, setChatOpen] = useState(false);
@@ -56,12 +57,11 @@ export default function Home() {
                             >
                                 Aliados
                             </Link>
-                            <button
+                            <ContactButton
                                 className="bg-compustore-red text-white px-6 py-2.5 rounded-lg font-medium hover:bg-red-700 transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95"
-                                aria-label="Contactar con COMPUSTORE"
                             >
                                 Contacto
-                            </button>
+                            </ContactButton>
                         </div>
                     </div>
                 </nav>
@@ -103,13 +103,11 @@ export default function Home() {
                                 >
                                     Ver Catálogo
                                 </button>
-                                <button
-                                    onClick={handleOpenChat}
+                                <ContactButton
                                     className="bg-white text-compustore-red border-2 border-compustore-red px-8 py-4 rounded-lg font-semibold text-lg hover:bg-compustore-red hover:text-white transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95 w-full sm:w-auto"
-                                    aria-label="Solicitar cotización"
                                 >
                                     Cotizar Ahora
-                                </button>
+                                </ContactButton>
                             </div>
                         </div>
 
@@ -302,12 +300,11 @@ export default function Home() {
                     <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
                         Contáctanos hoy y descubre cómo nuestras soluciones pueden transformar tu operación
                     </p>
-                    <button
+                    <ContactButton
                         className="bg-white text-compustore-red px-10 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-all duration-200 hover:shadow-2xl hover:scale-105 active:scale-95"
-                        aria-label="Contactar con nosotros"
                     >
                         Contactar Ahora
-                    </button>
+                    </ContactButton>
                 </div>
             </section>
 
@@ -332,7 +329,7 @@ export default function Home() {
                             <ul className="space-y-2 text-gray-400 text-sm">
                                 <li><Link href="#productos" className="hover:text-white transition-colors">Productos</Link></li>
                                 <li><Link href="#aliados" className="hover:text-white transition-colors">Aliados</Link></li>
-                                <li><Link href="#" className="hover:text-white transition-colors">Contacto</Link></li>
+                                <li><ContactButton className="hover:text-white transition-colors">Contacto</ContactButton></li>
                             </ul>
                         </div>
                         <div>

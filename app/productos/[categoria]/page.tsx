@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import BrandCarousel from "@/components/BrandCarousel";
 
 import Header from "@/components/Header";
+import ContactButton from "@/components/ContactButton";
 
 export function generateStaticParams() {
     return Object.keys(productCategories).map((categoria) => ({
@@ -12,12 +13,13 @@ export function generateStaticParams() {
     }));
 }
 
-export default function ProductCategoryPage({
+export default async function ProductCategoryPage({
     params,
 }: {
-    params: { categoria: string };
+    params: Promise<{ categoria: string }>;
 }) {
-    const categoryData = productCategories[params.categoria as ProductCategory];
+    const { categoria } = await params;
+    const categoryData = productCategories[categoria as ProductCategory];
 
     if (!categoryData) {
         notFound();
@@ -147,9 +149,9 @@ export default function ProductCategoryPage({
                     <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
                         Contáctanos para obtener una cotización personalizada
                     </p>
-                    <button className="bg-white text-compustore-red px-10 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-all duration-200 hover:shadow-2xl hover:scale-105 active:scale-95">
+                    <ContactButton className="bg-white text-compustore-red px-10 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-all duration-200 hover:shadow-2xl hover:scale-105 active:scale-95">
                         Contactar Ahora
-                    </button>
+                    </ContactButton>
                 </div>
             </section>
 
@@ -183,9 +185,9 @@ export default function ProductCategoryPage({
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href="#" className="hover:text-white transition-colors">
+                                    <ContactButton className="hover:text-white transition-colors">
                                         Contacto
-                                    </Link>
+                                    </ContactButton>
                                 </li>
                             </ul>
                         </div>
