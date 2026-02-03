@@ -336,7 +336,7 @@ export default function Home() {
                             <h4 className="font-semibold mb-4">Contacto</h4>
                             <p className="text-gray-400 text-sm">
                                 Email: info@compustore.com<br />
-                                Tel: +1 234 567 8900
+                                Dirección: Km 4 vía a Daule, Guayaquil, Ecuador<br /> 
                             </p>
                         </div>
                     </div>
