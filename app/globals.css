@@ -110,4 +110,55 @@
   .animate-scroll {
     animation: scroll 30s linear infinite;
   }
+
+  /* ─── Tech grid background — dark version ─── */
+  .hero-grid {
+    background-image:
+      linear-gradient(rgba(203, 27, 32, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(203, 27, 32, 0.07) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ─── Tech grid background — light version ─── */
+  .hero-grid-light {
+    background-image:
+      linear-gradient(rgba(203, 27, 32, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(203, 27, 32, 0.05) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ─── Glitch headline ─── */
+  @keyframes glitch {
+    0%, 84%, 100% { transform: translate(0); text-shadow: none; }
+    86% { transform: translate(-3px, 0); text-shadow: 3px 0 rgba(203,27,32,0.9); }
+    88% { transform: translate(3px, 0);  text-shadow: -3px 0 rgba(0,200,255,0.4); }
+    90% { transform: translate(-1px, 0); text-shadow: 2px 0 rgba(203,27,32,0.7); }
+    92% { transform: translate(0); text-shadow: none; }
+  }
+
+  .animate-glitch {
+    animation: glitch 7s ease-in-out infinite;
+  }
+
+  /* ─── Red glow pulse on button ─── */
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 12px rgba(203,27,32,0.4), 0 0 24px rgba(203,27,32,0.15); }
+    50%       { box-shadow: 0 0 28px rgba(203,27,32,0.7), 0 0 56px rgba(203,27,32,0.25); }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2.5s ease-in-out infinite;
+  }
+
+  /* ─── Scan line ─── */
+  @keyframes scan-move {
+    0%   { transform: translateY(0);     opacity: 0; }
+    4%   { opacity: 0.9; }
+    90%  { opacity: 0.35; }
+    100% { transform: translateY(92vh);  opacity: 0; }
+  }
+
+  .animate-scan {
+    animation: scan-move 9s linear infinite;
+  }
 }
