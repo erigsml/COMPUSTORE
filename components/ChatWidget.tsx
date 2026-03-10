@@ -35,7 +35,8 @@ export default function ChatWidget({
     // Message batching state
     const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const BATCH_TIMEOUT = 3000; // 3 seconds to wait for more messages
+    const BATCH_TIMEOUT = 500; // 0.5 seconds to wait for more messages
+    const isSendingRef = useRef(false); // Lock to prevent duplicate calls
 
     // Auto-scroll ref
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -74,15 +75,16 @@ export default function ChatWidget({
 
     // Function to send all pending messages to the AI
     const sendBatchedMessages = async (messagesToSend: Message[]) => {
-        if (messagesToSend.length === 0 || isLoading) return;
+        if (messagesToSend.length === 0 || isLoading || isSendingRef.current) return;
 
+        isSendingRef.current = true;
         setIsLoading(true);
 
         try {
             // Combine all pending messages into one request
             const combinedMessage = messagesToSend.map(msg => msg.text).join('\n\n');
 
-            const response = await fetch('https://n8n.mediclick.us/webhook/chatbot', {
+            const response = await fetch('http://63.180.73.191:5678/webhook/cd10d233-a9ed-43f7-a119-b2067df441f2', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chatInput: combinedMessage, sessionId })
@@ -90,12 +92,31 @@ export default function ChatWidget({
 
             if (!response.ok) throw new Error('Error de conexión');
 
-            const data = await response.json();
+            const responseText = await response.text();
+            if (!responseText) {
+                console.warn('Servidor respondió sin contenido');
+                throw new Error('No se recibió respuesta del asistente.');
+            }
+
+            let botText = "Disculpa, no pude procesar eso.";
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (e) {
+                console.error('Error al parsear JSON:', responseText);
+                // Si lo que devolvió el servidor es texto plano (ej: un error de n8n), lo usamos
+                botText = responseText;
+                const botMsg: Message = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'bot',
+                    text: botText
+                };
+                setMessages(prev => [...prev, botMsg]);
+                return; // Salimos ya que ya enviamos el mensaje
+            }
 
             // Handle the specific N8N response format provided by the user:
             // { "response": "...", "status": "success" }
-            let botText = "Disculpa, no pude procesar eso.";
-
             if (data.response) {
                 botText = data.response;
             } else if (data.output) {
@@ -124,13 +145,14 @@ export default function ChatWidget({
             }]);
         } finally {
             setIsLoading(false);
+            isSendingRef.current = false;
         }
     };
 
     const handleSendMessage = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
-        if (!inputValue.trim() || isLoading) return;
+        if (!inputValue.trim() || isLoading || isSendingRef.current) return;
 
         const userText = inputValue.trim();
         setInputValue("");
