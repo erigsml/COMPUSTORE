@@ -139,7 +139,6 @@ export default function Home() {
                             title="Toners"
                             description="Cartuchos de tóner de alta calidad para todas las marcas principales. Rendimiento superior y durabilidad garantizada."
                             imageSrc="/images/products/toners.jpg"
-                            slug="toners"
                         />
 
                         {/* Product Card 2 - Paper Pick Up Rollers */}
@@ -147,7 +146,6 @@ export default function Home() {
                             title="Paper Pick Up Rollers"
                             description="Rodillos de alimentación de papel de precisión. Reduce atascos y mejora la eficiencia operativa."
                             imageSrc="/images/products/pickup-rollers.png"
-                            slug="pickup-rollers"
                         />
 
                         {/* Product Card 3 - OPC Drums */}
@@ -155,7 +153,6 @@ export default function Home() {
                             title="OPC Drums"
                             description="Tambores fotoconductores de larga duración. Calidad de impresión excepcional y consistente."
                             imageSrc="/images/products/opc-drums-v2.png"
-                            slug="opc-drums"
                         />
 
                         {/* Product Card 4 - Chips de Impresoras */}
@@ -163,7 +160,6 @@ export default function Home() {
                             title="Chips de Impresoras"
                             description="Chips compatibles para cartuchos de tóner. Solución económica sin comprometer la calidad."
                             imageSrc="/images/products/printer-chips.jpg"
-                            slug="printer-chips"
                         />
 
                         {/* Product Card 5 - Soluciones de Software */}
@@ -171,7 +167,6 @@ export default function Home() {
                             title="Soluciones de Software"
                             description="Software de gestión de impresión avanzado. Optimiza costos y mejora la productividad."
                             imageSrc="/images/products/software-solutions.webp"
-                            slug="software-solutions"
                         />
 
                         {/* Product Card 6 - Mantenimiento */}
@@ -179,7 +174,6 @@ export default function Home() {
                             title="Kits de Mantenimiento"
                             description="Kits completos para mantenimiento preventivo. Extiende la vida útil de tus impresoras."
                             imageSrc="/images/products/maintenance-kits.jpg"
-                            slug="maintenance-kits"
                         />
                     </div>
 
@@ -336,7 +330,7 @@ export default function Home() {
                             <h4 className="font-semibold mb-4">Contacto</h4>
                             <p className="text-gray-400 text-sm">
                                 Email: info@compustore.com<br />
-                                Dirección: Km 4 vía a Daule, Guayaquil, Ecuador<br /> 
+                                Dirección: Km 4 vía a Daule, Guayaquil, Ecuador<br />
                             </p>
                         </div>
                     </div>
@@ -357,16 +351,18 @@ function ProductCard({
     description,
     icon,
     imageSrc,
-    slug
 }: {
     title: string;
     description: string;
     icon?: string;
     imageSrc?: string;
-    slug?: string;
 }) {
-    const content = (
-        <>
+    return (
+        <div
+            className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-compustore-red group flex flex-col h-full"
+            role="article"
+            aria-label={`Producto: ${title}`}
+        >
             <div className="mb-6 flex items-center justify-center">
                 {imageSrc ? (
                     <div className="relative h-48 w-full group-hover:scale-110 transition-transform duration-300">
@@ -389,34 +385,6 @@ function ProductCard({
             <p className="text-gray-600 leading-relaxed flex-grow">
                 {description}
             </p>
-            <div className="mt-6 text-compustore-red font-semibold flex items-center group-hover:gap-2 transition-all">
-                Ver más
-                <span className="ml-1 group-hover:ml-2 transition-all">→</span>
-            </div>
-        </>
-    );
-
-    if (slug) {
-        return (
-            <Link href={`/productos/${slug}`}>
-                <div
-                    className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-compustore-red group cursor-pointer flex flex-col h-full"
-                    role="article"
-                    aria-label={`Producto: ${title}`}
-                >
-                    {content}
-                </div>
-            </Link>
-        );
-    }
-
-    return (
-        <div
-            className="bg-white rounded-2xl p-8 shadow-sm hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-compustore-red group cursor-pointer flex flex-col h-full"
-            role="article"
-            aria-label={`Producto: ${title}`}
-        >
-            {content}
         </div>
     );
 }
