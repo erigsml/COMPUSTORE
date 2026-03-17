@@ -32,6 +32,11 @@ export default function ChatWidget({
     const [isLoading, setIsLoading] = useState(false);
     const [sessionId] = useState(() => Math.random().toString(36).substring(7)); // Simple session ID
 
+    // Voice recording state
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<BlobPart[]>([]);
+
     // Message batching state
     const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -73,6 +78,99 @@ export default function ChatWidget({
         };
     }, []);
 
+    const sendAudioToN8N = async (audioBlob: Blob) => {
+        if (isLoading || isSendingRef.current) return;
+
+        isSendingRef.current = true;
+        setIsLoading(true);
+
+        // Show temporary message
+        const tempMsgId = Date.now().toString();
+        setMessages(prev => [...prev, { id: tempMsgId, role: 'user', text: '🎤 Mensaje de voz enviado...' }]);
+
+        try {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'audio.webm');
+            formData.append('sessionId', sessionId);
+            // Opcional para distinguir en n8n
+            formData.append('type', 'audio');
+
+            const response = await fetch('http://63.180.73.191:5678/webhook-test/927f706e-189f-45fe-934a-fd7499590e14', {
+                method: 'POST',
+                // Content-Type is set automatically by the browser for FormData
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Error de conexión');
+
+            const responseText = await response.text();
+            if (!responseText) throw new Error('No se recibió respuesta del asistente.');
+
+            let botText = "Disculpa, no pude procesar eso.";
+            let data;
+            try {
+                data = JSON.parse(responseText);
+                if (data.response) botText = data.response;
+                else if (data.output) botText = data.output;
+                else if (typeof data === 'string') botText = data;
+                else if (Array.isArray(data) && data[0]?.output) botText = data[0].output;
+                else if (data.text) botText = data.text;
+            } catch (e) {
+                botText = responseText;
+            }
+
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'bot',
+                text: botText
+            }]);
+        } catch (error) {
+            console.error(error);
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'bot',
+                text: 'Lo siento, hubo un problema al enviar el audio. Por favor intenta de nuevo.'
+            }]);
+        } finally {
+            setIsLoading(false);
+            isSendingRef.current = false;
+        }
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                await sendAudioToN8N(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+        } catch (error) {
+            console.error("Error al acceder al micrófono:", error);
+            alert("Por favor, permite el acceso al micrófono para enviar audios.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
     // Function to send all pending messages to the AI
     const sendBatchedMessages = async (messagesToSend: Message[]) => {
         if (messagesToSend.length === 0 || isLoading || isSendingRef.current) return;
@@ -84,7 +182,7 @@ export default function ChatWidget({
             // Combine all pending messages into one request
             const combinedMessage = messagesToSend.map(msg => msg.text).join('\n\n');
 
-            const response = await fetch('http://63.180.73.191:5678/webhook/cd10d233-a9ed-43f7-a119-b2067df441f2', {
+            const response = await fetch('http://63.180.73.191:5678/webhook-test/927f706e-189f-45fe-934a-fd7499590e14', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chatInput: combinedMessage, sessionId })
@@ -263,24 +361,52 @@ export default function ChatWidget({
 
                         {/* Input Area */}
                         <div className="p-3 bg-white border-t border-gray-200">
-                            <form onSubmit={handleSendMessage} className="flex gap-2">
+                            <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
                                 <input
                                     type="text"
                                     value={inputValue}
                                     onChange={(e) => setInputValue(e.target.value)}
-                                    placeholder="Escribe tu mensaje..."
-                                    className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"
+                                    placeholder={isRecording ? "Grabando audio..." : "Escribe tu mensaje..."}
+                                    disabled={isRecording}
+                                    className={`flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800 ${isRecording ? 'bg-red-50 text-red-600 placeholder-red-400 border-red-200' : ''}`}
                                 />
-                                <button
-                                    type="submit"
-                                    disabled={isLoading || !inputValue.trim()}
-                                    className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="m22 2-7 20-4-9-9-4Z" />
-                                        <path d="M22 2 11 13" />
-                                    </svg>
-                                </button>
+                                {inputValue.trim() ? (
+                                    <button
+                                        type="submit"
+                                        disabled={isLoading || !inputValue.trim()}
+                                        className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                                        aria-label="Enviar mensaje"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m22 2-7 20-4-9-9-4Z" />
+                                            <path d="M22 2 11 13" />
+                                        </svg>
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={isRecording ? stopRecording : startRecording}
+                                        disabled={isLoading}
+                                        className={`p-2.5 rounded-full transition-colors shrink-0 flex items-center justify-center ${isRecording
+                                            ? 'bg-red-500 text-white animate-pulse'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-[#1B8BCC]'
+                                            }`}
+                                        title={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
+                                        aria-label={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
+                                    >
+                                        {isRecording ? (
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                                            </svg>
+                                        ) : (
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                                <line x1="12" x2="12" y1="19" y2="22" />
+                                            </svg>
+                                        )}
+                                    </button>
+                                )}
                             </form>
                         </div>
                     </div>
