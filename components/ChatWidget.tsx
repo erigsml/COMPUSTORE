@@ -1,44 +1,124 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
+
+// ─────────────────────────────────────────────
+// Helpers: cookie + fingerprint
+// ─────────────────────────────────────────────
+
+function getCookie(name: string): string | null {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+    return match ? match[2] : null;
+}
+
+function setCookie(name: string, value: string, days: number) {
+    const expires = new Date();
+    expires.setDate(expires.getDate() + days);
+    document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+}
+
+/**
+ * Genera o recupera un ID de dispositivo estable.
+ * Orden de prioridad:
+ *   1. Cookie existente (sobrevive limpiezas de caché)
+ *   2. localStorage (fallback si no hay cookie)
+ *   3. FingerprintJS (genera uno nuevo y lo persiste)
+ */
+async function getOrCreateDeviceId(): Promise<string> {
+    const COOKIE_KEY = "dox_did";
+    const LS_KEY = "dox_did";
+
+    // 1. Cookie
+    const fromCookie = getCookie(COOKIE_KEY);
+    if (fromCookie) return fromCookie;
+
+    // 2. localStorage
+    const fromLS = localStorage.getItem(LS_KEY);
+    if (fromLS) {
+        setCookie(COOKIE_KEY, fromLS, 30);
+        return fromLS;
+    }
+
+    // 3. FingerprintJS (carga dinámica para no bloquear el bundle)
+    try {
+        const FingerprintJS = await import(
+            // @ts-ignore — librería sin tipos oficiales en algunas versiones
+            "https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.esm.min.js"
+        );
+        const fp = await FingerprintJS.load();
+        const result = await fp.get();
+        const visitorId = result.visitorId;
+        setCookie(COOKIE_KEY, visitorId, 30);
+        localStorage.setItem(LS_KEY, visitorId);
+        return visitorId;
+    } catch {
+        // Fallback robusto si FingerprintJS falla y crypto.randomUUID() no está disponible (ej. en HTTP o navegadores muy antiguos)
+        const generateFallbackId = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        };
+        const fallback = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' 
+            ? crypto.randomUUID() 
+            : generateFallbackId();
+        setCookie(COOKIE_KEY, fallback, 30);
+        localStorage.setItem(LS_KEY, fallback);
+        return fallback;
+    }
+}
+
+// ─────────────────────────────────────────────
+// Tipos
+// ─────────────────────────────────────────────
 
 type Message = {
     id: string;
-    role: 'user' | 'bot';
+    role: "user" | "bot";
     text: string;
 };
 
+// ─────────────────────────────────────────────
+// Componente
+// ─────────────────────────────────────────────
+
 export default function ChatWidget({
     isOpen: externalIsOpen,
-    setIsOpen: externalSetIsOpen
+    setIsOpen: externalSetIsOpen,
 }: {
     isOpen?: boolean;
     setIsOpen?: (value: boolean) => void;
 } = {}) {
     const [internalIsOpen, setInternalIsOpen] = useState(false);
     const [showTooltip, setShowTooltip] = useState(false);
-    const [view, setView] = useState<'menu' | 'chat'>('chat');
 
-    // Use external state if provided, otherwise use internal state
     const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
     const setIsOpen = externalSetIsOpen || setInternalIsOpen;
 
-    // Chat State
+    // ── sessionId estable ──────────────────────
+    const [sessionId, setSessionId] = useState<string>("");
+
+    useEffect(() => {
+        getOrCreateDeviceId().then(setSessionId);
+    }, []);
+    // ──────────────────────────────────────────
+
     const [messages, setMessages] = useState<Message[]>([
-        { id: '1', role: 'bot', text: '¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?' }
+        {
+            id: "1",
+            role: "bot",
+            text: "¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?",
+        },
     ]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [sessionId] = useState(() => Math.random().toString(36).substring(7)); // Simple session ID
 
-    // Message batching state
     const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const BATCH_TIMEOUT = 500; // 0.5 seconds to wait for more messages
-    const isSendingRef = useRef(false); // Lock to prevent duplicate calls
+    const BATCH_TIMEOUT = 500;
+    const isSendingRef = useRef(false);
 
-    // Auto-scroll ref
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const toggleOpen = () => setIsOpen(!isOpen);
@@ -49,100 +129,90 @@ export default function ChatWidget({
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, view]);
+    }, [messages]);
 
-    // Periodic tooltip animation
+    // Tooltip periódico
     useEffect(() => {
         const interval = setInterval(() => {
             if (!isOpen) {
                 setShowTooltip(true);
-                // Hide after 5 seconds
                 setTimeout(() => setShowTooltip(false), 5000);
             }
-        }, 15000); // Show every 15 seconds
-
+        }, 15000);
         return () => clearInterval(interval);
     }, [isOpen]);
 
-    // Cleanup timeout on unmount
     useEffect(() => {
         return () => {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            }
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
     }, []);
 
-    // Function to send all pending messages to the AI
+    // ── Envío al webhook ───────────────────────
     const sendBatchedMessages = async (messagesToSend: Message[]) => {
         if (messagesToSend.length === 0 || isLoading || isSendingRef.current) return;
+
+        // Esperar a que el sessionId esté listo (raro, pero posible en primer render)
+        if (!sessionId) return;
 
         isSendingRef.current = true;
         setIsLoading(true);
 
         try {
-            // Combine all pending messages into one request
-            const combinedMessage = messagesToSend.map(msg => msg.text).join('\n\n');
+            const combinedMessage = messagesToSend.map((m) => m.text).join("\n\n");
 
-            const response = await fetch('http://63.180.73.191:5678/webhook/cd10d233-a9ed-43f7-a119-b2067df441f2', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chatInput: combinedMessage, sessionId })
-            });
+            const response = await fetch(
+                "http://63.180.73.191:5678/webhook/cd10d233-a9ed-43f7-a119-b2067df441f2",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        chatInput: combinedMessage,
+                        sessionId,          // ← ID estable de dispositivo
+                        userAgent: navigator.userAgent,   // contexto adicional para n8n
+                    }),
+                }
+            );
 
-            if (!response.ok) throw new Error('Error de conexión');
+            if (!response.ok) throw new Error("Error de conexión");
 
             const responseText = await response.text();
-            if (!responseText) {
-                console.warn('Servidor respondió sin contenido');
-                throw new Error('No se recibió respuesta del asistente.');
-            }
+            if (!responseText) throw new Error("No se recibió respuesta del asistente.");
 
             let botText = "Disculpa, no pude procesar eso.";
-            let data;
+            let data: any;
+
             try {
                 data = JSON.parse(responseText);
-            } catch (e) {
-                console.error('Error al parsear JSON:', responseText);
-                // Si lo que devolvió el servidor es texto plano (ej: un error de n8n), lo usamos
+            } catch {
                 botText = responseText;
-                const botMsg: Message = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'bot',
-                    text: botText
-                };
-                setMessages(prev => [...prev, botMsg]);
-                return; // Salimos ya que ya enviamos el mensaje
+                setMessages((prev) => [
+                    ...prev,
+                    { id: (Date.now() + 1).toString(), role: "bot", text: botText },
+                ]);
+                return;
             }
 
-            // Handle the specific N8N response format provided by the user:
-            // { "response": "...", "status": "success" }
-            if (data.response) {
-                botText = data.response;
-            } else if (data.output) {
-                botText = data.output;
-            } else if (typeof data === 'string') {
-                botText = data;
-            } else if (Array.isArray(data) && data[0]?.output) {
-                botText = data[0].output;
-            } else if (data.text) {
-                botText = data.text;
-            }
+            if (data.response) botText = data.response;
+            else if (data.output) botText = data.output;
+            else if (typeof data === "string") botText = data;
+            else if (Array.isArray(data) && data[0]?.output) botText = data[0].output;
+            else if (data.text) botText = data.text;
 
-            const botMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'bot',
-                text: botText
-            };
-            setMessages(prev => [...prev, botMsg]);
-
+            setMessages((prev) => [
+                ...prev,
+                { id: (Date.now() + 1).toString(), role: "bot", text: botText },
+            ]);
         } catch (error) {
             console.error(error);
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'bot',
-                text: 'Lo siento, hubo un problema al conectar con el servidor. Por favor intenta de nuevo.'
-            }]);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: Date.now().toString(),
+                    role: "bot",
+                    text: "Lo siento, hubo un problema al conectar. Por favor intenta de nuevo.",
+                },
+            ]);
         } finally {
             setIsLoading(false);
             isSendingRef.current = false;
@@ -151,70 +221,75 @@ export default function ChatWidget({
 
     const handleSendMessage = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-
         if (!inputValue.trim() || isLoading || isSendingRef.current) return;
 
         const userText = inputValue.trim();
         setInputValue("");
 
-        // Create user message
         const userMsg: Message = {
             id: Date.now().toString(),
-            role: 'user',
-            text: userText
+            role: "user",
+            text: userText,
         };
 
-        // Add to UI immediately
-        setMessages(prev => [...prev, userMsg]);
+        setMessages((prev) => [...prev, userMsg]);
+        setPendingMessages((prev) => [...prev, userMsg]);
 
-        // Add to pending messages queue
-        setPendingMessages(prev => [...prev, userMsg]);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-        // Clear existing timeout if any
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-        }
-
-        // Set new timeout to send batched messages
         timeoutRef.current = setTimeout(() => {
-            // Get current pending messages and clear the queue immediately
-            setPendingMessages(currentPending => {
-                if (currentPending.length > 0) {
-                    sendBatchedMessages(currentPending);
-                }
-                return []; // Clear the queue
+            setPendingMessages((currentPending) => {
+                if (currentPending.length > 0) sendBatchedMessages(currentPending);
+                return [];
             });
         }, BATCH_TIMEOUT);
     };
 
+    // ─────────────────────────────────────────
+    // Render
+    // ─────────────────────────────────────────
+
     return (
         <div className="fixed bottom-6 right-4 sm:right-6 z-[60] flex flex-col items-end gap-4">
-            {/* Engagement Tooltip */}
+            {/* Tooltip */}
             {!isOpen && (
                 <div
-                    className={`absolute bottom-20 right-0 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-100 whitespace-nowrap transition-all duration-500 transform ${showTooltip ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+                    className={`absolute bottom-20 right-0 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-100 whitespace-nowrap transition-all duration-500 transform ${
+                        showTooltip
+                            ? "opacity-100 translate-y-0"
+                            : "opacity-0 translate-y-4 pointer-events-none"
+                    }`}
                 >
                     <div className="text-gray-700 font-medium text-sm">
                         👋 ¿Necesitas ayuda con algo?
                     </div>
-                    {/* Arrow pointing down-right */}
                     <div className="absolute -bottom-2 right-6 w-4 h-4 bg-white transform rotate-45 border-r border-b border-gray-100"></div>
                 </div>
             )}
 
-            {/* Widget Container */}
+            {/* Widget */}
             {isOpen && (
-                <div className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 origin-bottom-right flex flex-col" style={{ maxHeight: '600px', height: '500px' }}>
-
-                    {/* HEADER */}
+                <div
+                    className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 origin-bottom-right flex flex-col"
+                    style={{ maxHeight: "600px", height: "500px" }}
+                >
+                    {/* Header */}
                     <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0 rounded-t-lg">
                         <div className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
                                 <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                             </svg>
-                            <span className="font-semibold text-lg">
-                                Asistente Virtual
-                            </span>
+                            <span className="font-semibold text-lg">Asistente Virtual</span>
                         </div>
                         <button
                             onClick={() => setIsOpen(false)}
@@ -222,28 +297,39 @@ export default function ChatWidget({
                             aria-label="Cerrar chat"
                             type="button"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
                                 <path d="M18 6 6 18" />
                                 <path d="m6 6 12 12" />
                             </svg>
                         </button>
                     </div>
 
-                    {/* CONTENT */}
-                    {/* CHAT INTERFACE */}
+                    {/* Chat */}
                     <div className="flex flex-col h-full bg-gray-50 overflow-hidden rounded-b-lg">
-                        {/* Messages Area */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {messages.map((msg) => (
                                 <div
                                     key={msg.id}
-                                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                    className={`flex ${
+                                        msg.role === "user" ? "justify-end" : "justify-start"
+                                    }`}
                                 >
                                     <div
-                                        className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user'
-                                            ? 'bg-[#1B8BCC] text-white rounded-br-none'
-                                            : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
-                                            }`}
+                                        className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+                                            msg.role === "user"
+                                                ? "bg-[#1B8BCC] text-white rounded-br-none"
+                                                : "bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm"
+                                        }`}
                                     >
                                         {msg.text}
                                     </div>
@@ -261,7 +347,7 @@ export default function ChatWidget({
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input Area */}
+                        {/* Input */}
                         <div className="p-3 bg-white border-t border-gray-200">
                             <form onSubmit={handleSendMessage} className="flex gap-2">
                                 <input
@@ -276,8 +362,18 @@ export default function ChatWidget({
                                     disabled={isLoading || !inputValue.trim()}
                                     className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="m22 2-7 20-4-9-9-4Z" />
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M22 2-7 20-4-9-9-4Z" />
                                         <path d="M22 2 11 13" />
                                     </svg>
                                 </button>
@@ -287,15 +383,25 @@ export default function ChatWidget({
                 </div>
             )}
 
-            {/* Toggle Button */}
+            {/* Botón flotante */}
             {!isOpen && (
                 <button
                     onClick={toggleOpen}
                     className="bg-[#1B8BCC] text-white p-4 rounded-full shadow-lg hover:bg-[#1676ad] transition-all hover:scale-110 active:scale-95 flex items-center justify-center animate-bounce-subtle"
-                    aria-label="Abrir opciones de ayuda"
-                    style={{ width: '60px', height: '60px' }}
+                    aria-label="Abrir asistente"
+                    style={{ width: "60px", height: "60px" }}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
                         <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                     </svg>
                 </button>
