@@ -52,7 +52,10 @@ async function getOrCreateDeviceId(): Promise<string> {
     }
 }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 8819243e99b1cd918b606da975826121d02e4ca9
 type Message = {
     id: string;
     role: "user" | "bot";
@@ -362,6 +365,7 @@ export default function ChatWidget({
             const formData = new FormData();
             formData.append('image', compressedFile, compressedFile.name);
             formData.append('sessionId', sessionId);
+            formData.append('userAgent', navigator.userAgent);
             formData.append('type', 'image');
             if (caption) formData.append('caption', caption);
 
@@ -407,6 +411,7 @@ export default function ChatWidget({
             const formData = new FormData();
             formData.append('audio', audioBlob, 'audio.webm');
             formData.append('sessionId', sessionId);
+            formData.append('userAgent', navigator.userAgent);
             formData.append('type', 'audio');
 
             const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {
@@ -513,14 +518,14 @@ export default function ChatWidget({
             setIsRecording(true);
         } catch (error: any) {
             console.error("Error al acceder al micrófono:", error);
-            
+
             let errorMessage = "No pudimos acceder al micrófono. Por favor verifica tus permisos.";
             if (error.name === "NotFoundError" || error.message?.includes("Requested device not found")) {
                 errorMessage = "Lo siento, no detectamos ningún micrófono conectado. Por favor asegúrate de tener uno antes de grabar audios.";
             } else if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
                 errorMessage = "Parece que el navegador ha bloqueado el acceso al micrófono. Por favor, permite el acceso en la configuración de la página.";
             }
-            
+
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'bot',
