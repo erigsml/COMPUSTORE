@@ -55,7 +55,6 @@ function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean 
                 setBars(amplitudes.map(v => Math.max(0.08, v / max)));
                 ctx.close();
             } catch {
-                // fallback: keep default bars
             }
         };
         analyze();
@@ -91,12 +90,10 @@ function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean 
                 onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
             />
 
-            {/* Play/Pause */}
             <button
                 onClick={togglePlay}
-                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                    isUser ? 'bg-white/20 hover:bg-white/35' : 'bg-[#1B8BCC]/15 hover:bg-[#1B8BCC]/25'
-                }`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isUser ? 'bg-white/20 hover:bg-white/35' : 'bg-[#1B8BCC]/15 hover:bg-[#1B8BCC]/25'
+                    }`}
             >
                 {isPlaying ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -110,7 +107,6 @@ function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean 
                 )}
             </button>
 
-            {/* Waveform bars */}
             <div
                 className="flex items-center gap-[2px] flex-1 h-8 cursor-pointer"
                 onClick={handleSeek}
@@ -118,17 +114,15 @@ function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean 
                 {bars.map((h, i) => (
                     <div
                         key={i}
-                        className={`flex-1 rounded-full transition-colors duration-150 ${
-                            i < playedBars
+                        className={`flex-1 rounded-full transition-colors duration-150 ${i < playedBars
                                 ? (isUser ? 'bg-white' : 'bg-[#1B8BCC]')
                                 : (isUser ? 'bg-white/35' : 'bg-gray-300')
-                        }`}
+                            }`}
                         style={{ height: `${Math.round(h * 26 + 4)}px` }}
                     />
                 ))}
             </div>
 
-            {/* Timer */}
             <span className={`text-[11px] font-mono tabular-nums shrink-0 ${isUser ? 'text-white/75' : 'text-gray-400'}`}>
                 {formatTime(isPlaying || currentTime > 0 ? currentTime : duration)}
             </span>
@@ -136,6 +130,50 @@ function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean 
     );
 }
 
+
+const compressImage = async (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new window.Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const cvs = document.createElement('canvas');
+                const MAX_WIDTH = 1200;
+                const MAX_HEIGHT = 1200;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                cvs.width = width;
+                cvs.height = height;
+                const ctx = cvs.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+                cvs.toBlob((blob) => {
+                    if (blob) {
+                        resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' }));
+                    } else {
+                        reject(new Error('Compresión fallida'));
+                    }
+                }, 'image/jpeg', 0.7);
+            };
+            img.onerror = () => reject(new Error('Error al cargar la imagen'));
+        };
+        reader.onerror = () => reject(new Error('Error al leer el archivo'));
+    });
+};
 
 export default function ChatWidget({
     isOpen: externalIsOpen,
@@ -148,19 +186,16 @@ export default function ChatWidget({
     const [showTooltip, setShowTooltip] = useState(false);
     const [view, setView] = useState<'menu' | 'chat'>('chat');
 
-    // Use external state if provided, otherwise use internal state
     const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
     const setIsOpen = externalSetIsOpen || setInternalIsOpen;
 
-    // Chat State
     const [messages, setMessages] = useState<Message[]>([
         { id: '1', role: 'bot', text: '¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?' }
     ]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [sessionId] = useState(() => Math.random().toString(36).substring(7)); // Simple session ID
+    const [sessionId] = useState(() => Math.random().toString(36).substring(7));
 
-    // Voice recording state
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<BlobPart[]>([]);
@@ -170,21 +205,19 @@ export default function ChatWidget({
     const [waveformBars, setWaveformBars] = useState<number[]>(Array(32).fill(0.08));
     const [recordingTime, setRecordingTime] = useState(0);
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const cancelRecordingRef = useRef(false);
 
-    // Message batching state
     const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const BATCH_TIMEOUT = 500; // 0.5 seconds to wait for more messages
-    const isSendingRef = useRef(false); // Lock to prevent duplicate calls
+    const BATCH_TIMEOUT = 500;
+    const isSendingRef = useRef(false);
 
-    // Image attachment state
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [pendingImage, setPendingImage] = useState<File | null>(null);
     const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
     const [isDraggingOver, setIsDraggingOver] = useState(false);
     const dragCounterRef = useRef(0);
 
-    // Auto-scroll ref
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const toggleOpen = () => setIsOpen(!isOpen);
@@ -197,20 +230,17 @@ export default function ChatWidget({
         scrollToBottom();
     }, [messages, view]);
 
-    // Periodic tooltip animation
     useEffect(() => {
         const interval = setInterval(() => {
             if (!isOpen) {
                 setShowTooltip(true);
-                // Hide after 5 seconds
                 setTimeout(() => setShowTooltip(false), 5000);
             }
-        }, 15000); // Show every 15 seconds
+        }, 15000);
 
         return () => clearInterval(interval);
     }, [isOpen]);
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -270,13 +300,15 @@ export default function ChatWidget({
         clearPendingImage();
 
         try {
+            const compressedFile = await compressImage(imageFile);
+
             const formData = new FormData();
-            formData.append('image', imageFile, imageFile.name);
+            formData.append('image', compressedFile, compressedFile.name);
             formData.append('sessionId', sessionId);
             formData.append('type', 'image');
             if (caption) formData.append('caption', caption);
 
-            const response = await fetch('https://n8n.mediclick.us/webhook-test/927f706e-189f-45fe-934a-fd7499590e14', {
+            const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {
                 method: 'POST',
                 body: formData
             });
@@ -318,12 +350,10 @@ export default function ChatWidget({
             const formData = new FormData();
             formData.append('audio', audioBlob, 'audio.webm');
             formData.append('sessionId', sessionId);
-            // Opcional para distinguir en n8n
             formData.append('type', 'audio');
 
-            const response = await fetch('https://n8n.mediclick.us/webhook-test/927f706e-189f-45fe-934a-fd7499590e14', {
+            const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {
                 method: 'POST',
-                // Content-Type is set automatically by the browser for FormData
                 body: formData
             });
 
@@ -367,7 +397,6 @@ export default function ChatWidget({
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-            // Set up audio analysis for waveform visualization
             const audioContext = new AudioContext();
             const analyser = audioContext.createAnalyser();
             analyser.fftSize = 128;
@@ -391,13 +420,23 @@ export default function ChatWidget({
             };
             animate();
 
-            // Start recording timer
             setRecordingTime(0);
-            recordingTimerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
+            recordingTimerRef.current = setInterval(() => {
+                setRecordingTime(prev => {
+                    if (prev + 1 >= 35) {
+                        setTimeout(() => {
+                            stopRecording();
+                        }, 50);
+                        return 35;
+                    }
+                    return prev + 1;
+                });
+            }, 1000);
 
             const mediaRecorder = new MediaRecorder(stream);
             mediaRecorderRef.current = mediaRecorder;
             audioChunksRef.current = [];
+            cancelRecordingRef.current = false;
 
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
@@ -406,8 +445,10 @@ export default function ChatWidget({
             };
 
             mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                await sendAudioToN8N(audioBlob);
+                if (!cancelRecordingRef.current) {
+                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                    await sendAudioToN8N(audioBlob);
+                }
                 stream.getTracks().forEach(track => track.stop());
             };
 
@@ -420,7 +461,7 @@ export default function ChatWidget({
     };
 
     const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
             if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
@@ -431,7 +472,19 @@ export default function ChatWidget({
         }
     };
 
-    // Function to send all pending messages to the AI
+    const cancelRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            cancelRecordingRef.current = true;
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            if (audioContextRef.current) audioContextRef.current.close();
+            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+            setWaveformBars(Array(32).fill(0.08));
+            setRecordingTime(0);
+        }
+    };
+
     const sendBatchedMessages = async (messagesToSend: Message[]) => {
         if (messagesToSend.length === 0 || isLoading || isSendingRef.current) return;
 
@@ -439,10 +492,9 @@ export default function ChatWidget({
         setIsLoading(true);
 
         try {
-            // Combine all pending messages into one request
             const combinedMessage = messagesToSend.map(msg => msg.text).join('\n\n');
 
-            const response = await fetch('http://63.180.73.191:5678/webhook-test/927f706e-189f-45fe-934a-fd7499590e14', {
+            const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chatInput: combinedMessage, sessionId })
@@ -462,7 +514,6 @@ export default function ChatWidget({
                 data = JSON.parse(responseText);
             } catch (e) {
                 console.error('Error al parsear JSON:', responseText);
-                // Si lo que devolvió el servidor es texto plano (ej: un error de n8n), lo usamos
                 botText = responseText;
                 const botMsg: Message = {
                     id: (Date.now() + 1).toString(),
@@ -470,11 +521,9 @@ export default function ChatWidget({
                     text: botText
                 };
                 setMessages(prev => [...prev, botMsg]);
-                return; // Salimos ya que ya enviamos el mensaje
+                return;
             }
 
-            // Handle the specific N8N response format provided by the user:
-            // { "response": "...", "status": "success" }
             if (data.response) {
                 botText = data.response;
             } else if (data.output) {
@@ -522,39 +571,32 @@ export default function ChatWidget({
         const userText = inputValue.trim();
         setInputValue("");
 
-        // Create user message
         const userMsg: Message = {
             id: Date.now().toString(),
             role: 'user',
             text: userText
         };
 
-        // Add to UI immediately
         setMessages(prev => [...prev, userMsg]);
 
-        // Add to pending messages queue
         setPendingMessages(prev => [...prev, userMsg]);
 
-        // Clear existing timeout if any
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
         }
 
-        // Set new timeout to send batched messages
         timeoutRef.current = setTimeout(() => {
-            // Get current pending messages and clear the queue immediately
             setPendingMessages(currentPending => {
                 if (currentPending.length > 0) {
                     sendBatchedMessages(currentPending);
                 }
-                return []; // Clear the queue
+                return [];
             });
         }, BATCH_TIMEOUT);
     };
 
     return (
         <div className="fixed bottom-6 right-4 sm:right-6 z-[60] flex flex-col items-end gap-4">
-            {/* Engagement Tooltip */}
             {!isOpen && (
                 <div
                     className={`absolute bottom-20 right-0 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-100 whitespace-nowrap transition-all duration-500 transform ${showTooltip ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
@@ -562,12 +604,10 @@ export default function ChatWidget({
                     <div className="text-gray-700 font-medium text-sm">
                         👋 ¿Necesitas ayuda con algo?
                     </div>
-                    {/* Arrow pointing down-right */}
                     <div className="absolute -bottom-2 right-6 w-4 h-4 bg-white transform rotate-45 border-r border-b border-gray-100"></div>
                 </div>
             )}
 
-            {/* Widget Container */}
             {isOpen && (
                 <div
                     className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 origin-bottom-right flex flex-col relative"
@@ -577,7 +617,6 @@ export default function ChatWidget({
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                 >
-                    {/* Drag overlay */}
                     {isDraggingOver && (
                         <div className="absolute inset-0 z-10 rounded-lg bg-[#1B8BCC]/10 border-2 border-dashed border-[#1B8BCC] flex flex-col items-center justify-center gap-2 pointer-events-none">
                             <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#1B8BCC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -589,7 +628,6 @@ export default function ChatWidget({
                         </div>
                     )}
 
-                    {/* HEADER */}
                     <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0 rounded-t-lg">
                         <div className="flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -612,10 +650,7 @@ export default function ChatWidget({
                         </button>
                     </div>
 
-                    {/* CONTENT */}
-                    {/* CHAT INTERFACE */}
                     <div className="flex flex-col h-full bg-gray-50 overflow-hidden rounded-b-lg">
-                        {/* Messages Area */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {messages.map((msg) => (
                                 <div
@@ -653,9 +688,7 @@ export default function ChatWidget({
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input Area */}
                         <div className="px-3 pt-2 pb-3 bg-white border-t border-gray-200">
-                            {/* Image preview */}
                             {pendingImageUrl && !isRecording && (
                                 <div className="mb-2 relative inline-block">
                                     <img src={pendingImageUrl} alt="Preview" className="h-16 w-16 object-cover rounded-lg border border-gray-200" />
@@ -667,7 +700,6 @@ export default function ChatWidget({
                                 </div>
                             )}
                             <form onSubmit={handleSendMessage} className="flex gap-1.5 items-center">
-                                {/* Hidden file input */}
                                 <input
                                     ref={fileInputRef}
                                     type="file"
@@ -675,7 +707,6 @@ export default function ChatWidget({
                                     className="hidden"
                                     onChange={handleImageSelect}
                                 />
-                                {/* Paperclip button */}
                                 {!isRecording && (
                                     <button
                                         type="button"
@@ -690,6 +721,19 @@ export default function ChatWidget({
                                 )}
                                 {isRecording ? (
                                     <div className="flex items-center gap-2 flex-1 px-1">
+                                        <button
+                                            type="button"
+                                            onClick={cancelRecording}
+                                            className="p-1 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors shrink-0"
+                                            title="Cancelar grabación"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                            </svg>
+                                        </button>
                                         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
                                         <div className="flex items-center justify-between flex-1 h-8">
                                             {waveformBars.map((scale, i) => (
@@ -756,8 +800,6 @@ export default function ChatWidget({
                 </div>
             )}
 
-
-            {/* Toggle Button */}
             {!isOpen && (
                 <button
                     onClick={toggleOpen}
