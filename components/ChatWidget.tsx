@@ -52,10 +52,6 @@ async function getOrCreateDeviceId(): Promise<string> {
     }
 }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 8819243e99b1cd918b606da975826121d02e4ca9
 type Message = {
     id: string;
     role: "user" | "bot";
