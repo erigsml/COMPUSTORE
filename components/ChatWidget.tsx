@@ -8,6 +8,7 @@ type Message = {
     role: 'user' | 'bot';
     text: string;
     audioUrl?: string;
+    imageUrl?: string;
 };
 
 function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean }) {
@@ -176,6 +177,13 @@ export default function ChatWidget({
     const BATCH_TIMEOUT = 500; // 0.5 seconds to wait for more messages
     const isSendingRef = useRef(false); // Lock to prevent duplicate calls
 
+    // Image attachment state
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pendingImage, setPendingImage] = useState<File | null>(null);
+    const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+    const [isDraggingOver, setIsDraggingOver] = useState(false);
+    const dragCounterRef = useRef(0);
+
     // Auto-scroll ref
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -211,6 +219,91 @@ export default function ChatWidget({
             if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
         };
     }, []);
+
+    const handleDragEnter = (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current++;
+        if (e.dataTransfer.types.includes('Files')) setIsDraggingOver(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current--;
+        if (dragCounterRef.current === 0) setIsDraggingOver(false);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounterRef.current = 0;
+        setIsDraggingOver(false);
+        const file = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'));
+        if (!file) return;
+        if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl);
+        setPendingImage(file);
+        setPendingImageUrl(URL.createObjectURL(file));
+    };
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl);
+        setPendingImage(file);
+        setPendingImageUrl(URL.createObjectURL(file));
+        e.target.value = '';
+    };
+
+    const clearPendingImage = () => {
+        if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl);
+        setPendingImage(null);
+        setPendingImageUrl(null);
+    };
+
+    const sendImageToN8N = async (imageFile: File, caption: string = '') => {
+        isSendingRef.current = true;
+        setIsLoading(true);
+
+        const imageUrl = URL.createObjectURL(imageFile);
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: caption, imageUrl }]);
+        setInputValue('');
+        clearPendingImage();
+
+        try {
+            const formData = new FormData();
+            formData.append('image', imageFile, imageFile.name);
+            formData.append('sessionId', sessionId);
+            formData.append('type', 'image');
+            if (caption) formData.append('caption', caption);
+
+            const response = await fetch('https://n8n.mediclick.us/webhook-test/927f706e-189f-45fe-934a-fd7499590e14', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Error de conexión');
+
+            const responseText = await response.text();
+            if (!responseText) throw new Error('Sin respuesta');
+
+            let botText = "Disculpa, no pude procesar eso.";
+            try {
+                const data = JSON.parse(responseText);
+                if (data.response) botText = data.response;
+                else if (data.output) botText = data.output;
+                else if (data.text) botText = data.text;
+                else if (typeof data === 'string') botText = data;
+            } catch { botText = responseText; }
+
+            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'bot', text: botText }]);
+        } catch (error) {
+            console.error(error);
+            setMessages(prev => [...prev, { id: Date.now().toString(), role: 'bot', text: 'Lo siento, hubo un problema al enviar la imagen.' }]);
+        } finally {
+            setIsLoading(false);
+            isSendingRef.current = false;
+        }
+    };
 
     const sendAudioToN8N = async (audioBlob: Blob) => {
         if (isLoading || isSendingRef.current) return;
@@ -417,7 +510,14 @@ export default function ChatWidget({
     const handleSendMessage = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
-        if (!inputValue.trim() || isLoading || isSendingRef.current) return;
+        if (isLoading || isSendingRef.current) return;
+
+        if (pendingImage) {
+            await sendImageToN8N(pendingImage, inputValue.trim());
+            return;
+        }
+
+        if (!inputValue.trim()) return;
 
         const userText = inputValue.trim();
         setInputValue("");
@@ -469,7 +569,25 @@ export default function ChatWidget({
 
             {/* Widget Container */}
             {isOpen && (
-                <div className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 origin-bottom-right flex flex-col" style={{ maxHeight: '600px', height: '500px' }}>
+                <div
+                    className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 origin-bottom-right flex flex-col relative"
+                    style={{ maxHeight: '600px', height: '500px' }}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                >
+                    {/* Drag overlay */}
+                    {isDraggingOver && (
+                        <div className="absolute inset-0 z-10 rounded-lg bg-[#1B8BCC]/10 border-2 border-dashed border-[#1B8BCC] flex flex-col items-center justify-center gap-2 pointer-events-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#1B8BCC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                                <circle cx="9" cy="9" r="2" />
+                                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                            </svg>
+                            <span className="text-[#1B8BCC] font-medium text-sm">Suelta la imagen aquí</span>
+                        </div>
+                    )}
 
                     {/* HEADER */}
                     <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0 rounded-t-lg">
@@ -505,12 +623,17 @@ export default function ChatWidget({
                                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     <div
-                                        className={`max-w-[80%] rounded-2xl text-sm ${msg.role === 'user'
+                                        className={`max-w-[80%] rounded-2xl text-sm overflow-hidden ${msg.role === 'user'
                                             ? 'bg-[#1B8BCC] text-white rounded-br-none'
                                             : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
-                                            } ${msg.audioUrl ? 'p-1.5' : 'p-3'}`}
+                                            } ${msg.imageUrl ? 'p-0' : msg.audioUrl ? 'p-1.5' : 'p-3'}`}
                                     >
-                                        {msg.audioUrl ? (
+                                        {msg.imageUrl ? (
+                                            <>
+                                                <img src={msg.imageUrl} alt="Imagen adjunta" className="max-w-full block" />
+                                                {msg.text && <p className="px-3 py-2 text-sm">{msg.text}</p>}
+                                            </>
+                                        ) : msg.audioUrl ? (
                                             <AudioMessage audioUrl={msg.audioUrl} isUser={msg.role === 'user'} />
                                         ) : (
                                             msg.text
@@ -531,8 +654,40 @@ export default function ChatWidget({
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-3 bg-white border-t border-gray-200">
-                            <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+                        <div className="px-3 pt-2 pb-3 bg-white border-t border-gray-200">
+                            {/* Image preview */}
+                            {pendingImageUrl && !isRecording && (
+                                <div className="mb-2 relative inline-block">
+                                    <img src={pendingImageUrl} alt="Preview" className="h-16 w-16 object-cover rounded-lg border border-gray-200" />
+                                    <button
+                                        type="button"
+                                        onClick={clearPendingImage}
+                                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-600 text-white rounded-full flex items-center justify-center text-xs font-bold leading-none"
+                                    >×</button>
+                                </div>
+                            )}
+                            <form onSubmit={handleSendMessage} className="flex gap-1.5 items-center">
+                                {/* Hidden file input */}
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleImageSelect}
+                                />
+                                {/* Paperclip button */}
+                                {!isRecording && (
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="p-2 text-gray-400 hover:text-[#1B8BCC] transition-colors shrink-0"
+                                        aria-label="Adjuntar imagen"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                                        </svg>
+                                    </button>
+                                )}
                                 {isRecording ? (
                                     <div className="flex items-center gap-2 flex-1 px-1">
                                         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
@@ -558,10 +713,10 @@ export default function ChatWidget({
                                         className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"
                                     />
                                 )}
-                                {!isRecording && inputValue.trim() ? (
+                                {!isRecording && (inputValue.trim() || pendingImage) ? (
                                     <button
                                         type="submit"
-                                        disabled={isLoading || !inputValue.trim()}
+                                        disabled={isLoading}
                                         className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
                                         aria-label="Enviar mensaje"
                                     >
@@ -600,6 +755,7 @@ export default function ChatWidget({
                     </div>
                 </div>
             )}
+
 
             {/* Toggle Button */}
             {!isOpen && (
