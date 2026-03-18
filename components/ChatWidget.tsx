@@ -162,7 +162,7 @@ export default function ChatWidget({
             const combinedMessage = messagesToSend.map((m) => m.text).join("\n\n");
 
             const response = await fetch(
-                "http://63.180.73.191:5678/webhook/cd10d233-a9ed-43f7-a119-b2067df441f2",
+                "https://n8n.mediclick.us/webhook/7a795449-952f-488c-a668-6716d3f37318",
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -177,7 +177,13 @@ export default function ChatWidget({
             if (!response.ok) throw new Error("Error de conexión");
 
             const responseText = await response.text();
-            if (!responseText) throw new Error("No se recibió respuesta del asistente.");
+            if (!responseText) {
+                console.warn("Respuesta vacía del webhook. Es posible que el flujo esté demorando o el nodo Respond To Webhook no se haya ejecutado.");
+                return setMessages((prev) => [
+                    ...prev,
+                    { id: (Date.now() + 1).toString(), role: "bot", text: "Procesando... (El servidor recibió el mensaje pero no ha respondido con texto)." },
+                ]);
+            }
 
             let botText = "Disculpa, no pude procesar eso.";
             let data: any;
