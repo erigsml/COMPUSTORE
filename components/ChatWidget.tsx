@@ -1,11 +1,61 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
+
+function getCookie(name: string): string | null {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+    return match ? match[2] : null;
+}
+
+function setCookie(name: string, value: string, days: number) {
+    const expires = new Date();
+    expires.setDate(expires.getDate() + days);
+    document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+}
+
+async function getOrCreateDeviceId(): Promise<string> {
+    const COOKIE_KEY = "dox_did";
+    const LS_KEY = "dox_did";
+
+    const fromCookie = getCookie(COOKIE_KEY);
+    if (fromCookie) return fromCookie;
+
+    const fromLS = localStorage.getItem(LS_KEY);
+    if (fromLS) {
+        setCookie(COOKIE_KEY, fromLS, 30);
+        return fromLS;
+    }
+
+    try {
+        const fpUrl = "https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.esm.min.js";
+        const FingerprintJS = await import(/* webpackIgnore: true */ fpUrl);
+        const fp = await FingerprintJS.load();
+        const result = await fp.get();
+        const visitorId = result.visitorId;
+        setCookie(COOKIE_KEY, visitorId, 30);
+        localStorage.setItem(LS_KEY, visitorId);
+        return visitorId;
+    } catch {
+        const generateFallbackId = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        };
+        const fallback = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : generateFallbackId();
+        setCookie(COOKIE_KEY, fallback, 30);
+        localStorage.setItem(LS_KEY, fallback);
+        return fallback;
+    }
+}
+
 
 type Message = {
     id: string;
-    role: 'user' | 'bot';
+    role: "user" | "bot";
     text: string;
     audioUrl?: string;
     imageUrl?: string;
@@ -115,8 +165,8 @@ function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean 
                     <div
                         key={i}
                         className={`flex-1 rounded-full transition-colors duration-150 ${i < playedBars
-                                ? (isUser ? 'bg-white' : 'bg-[#1B8BCC]')
-                                : (isUser ? 'bg-white/35' : 'bg-gray-300')
+                            ? (isUser ? 'bg-white' : 'bg-[#1B8BCC]')
+                            : (isUser ? 'bg-white/35' : 'bg-gray-300')
                             }`}
                         style={{ height: `${Math.round(h * 26 + 4)}px` }}
                     />
@@ -177,24 +227,32 @@ const compressImage = async (file: File): Promise<File> => {
 
 export default function ChatWidget({
     isOpen: externalIsOpen,
-    setIsOpen: externalSetIsOpen
+    setIsOpen: externalSetIsOpen,
 }: {
     isOpen?: boolean;
     setIsOpen?: (value: boolean) => void;
 } = {}) {
     const [internalIsOpen, setInternalIsOpen] = useState(false);
     const [showTooltip, setShowTooltip] = useState(false);
-    const [view, setView] = useState<'menu' | 'chat'>('chat');
 
     const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
     const setIsOpen = externalSetIsOpen || setInternalIsOpen;
 
+    const [sessionId, setSessionId] = useState<string>("");
+
+    useEffect(() => {
+        getOrCreateDeviceId().then(setSessionId);
+    }, []);
+
     const [messages, setMessages] = useState<Message[]>([
-        { id: '1', role: 'bot', text: '¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?' }
+        {
+            id: "1",
+            role: "bot",
+            text: "¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?",
+        },
     ]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [sessionId] = useState(() => Math.random().toString(36).substring(7));
 
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -228,7 +286,7 @@ export default function ChatWidget({
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, view]);
+    }, [messages]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -237,7 +295,6 @@ export default function ChatWidget({
                 setTimeout(() => setShowTooltip(false), 5000);
             }
         }, 15000);
-
         return () => clearInterval(interval);
     }, [isOpen]);
 
@@ -413,7 +470,7 @@ export default function ChatWidget({
                 smoothed = smoothed.map((curr, i) => {
                     const index = Math.floor(i * dataArray.length / BAR_COUNT);
                     const target = Math.max(0.08, dataArray[index] / 255);
-                    return curr + (target - curr) * 0.25; // lerp suavizado
+                    return curr + (target - curr) * 0.25;
                 });
                 setWaveformBars([...smoothed]);
                 animationFrameRef.current = requestAnimationFrame(animate);
@@ -454,9 +511,21 @@ export default function ChatWidget({
 
             mediaRecorder.start();
             setIsRecording(true);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error al acceder al micrófono:", error);
-            alert("Por favor, permite el acceso al micrófono para enviar audios.");
+            
+            let errorMessage = "No pudimos acceder al micrófono. Por favor verifica tus permisos.";
+            if (error.name === "NotFoundError" || error.message?.includes("Requested device not found")) {
+                errorMessage = "Lo siento, no detectamos ningún micrófono conectado. Por favor asegúrate de tener uno antes de grabar audios.";
+            } else if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+                errorMessage = "Parece que el navegador ha bloqueado el acceso al micrófono. Por favor, permite el acceso en la configuración de la página.";
+            }
+            
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'bot',
+                text: errorMessage
+            }]);
         }
     };
 
@@ -488,40 +557,49 @@ export default function ChatWidget({
     const sendBatchedMessages = async (messagesToSend: Message[]) => {
         if (messagesToSend.length === 0 || isLoading || isSendingRef.current) return;
 
+        if (!sessionId) return;
+
         isSendingRef.current = true;
         setIsLoading(true);
 
         try {
-            const combinedMessage = messagesToSend.map(msg => msg.text).join('\n\n');
+            const combinedMessage = messagesToSend.map((m) => m.text).join("\n\n");
 
-            const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chatInput: combinedMessage, sessionId })
-            });
+            const response = await fetch(
+                "https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        chatInput: combinedMessage,
+                        sessionId,
+                        userAgent: navigator.userAgent,
+                    }),
+                }
+            );
 
-            if (!response.ok) throw new Error('Error de conexión');
+            if (!response.ok) throw new Error("Error de conexión");
 
             const responseText = await response.text();
             if (!responseText) {
-                console.warn('Servidor respondió sin contenido');
-                throw new Error('No se recibió respuesta del asistente.');
+                console.warn("Respuesta vacía del webhook. Es posible que el flujo esté demorando o el nodo Respond To Webhook no se haya ejecutado.");
+                return setMessages((prev) => [
+                    ...prev,
+                    { id: (Date.now() + 1).toString(), role: "bot", text: "Procesando... (El servidor recibió el mensaje pero no ha respondido con texto)." },
+                ]);
             }
 
             let botText = "Disculpa, no pude procesar eso.";
-            let data;
+            let data: any;
+
             try {
                 data = JSON.parse(responseText);
             } catch (e) {
                 console.error('Error al parsear JSON:', responseText);
-                botText = responseText;
-                const botMsg: Message = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'bot',
-                    text: botText
-                };
-                setMessages(prev => [...prev, botMsg]);
-                return;
+                return setMessages((prev) => [
+                    ...prev,
+                    { id: (Date.now() + 1).toString(), role: "bot", text: responseText }
+                ]);
             }
 
             if (data.response) {
@@ -536,20 +614,20 @@ export default function ChatWidget({
                 botText = data.text;
             }
 
-            const botMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'bot',
-                text: botText
-            };
-            setMessages(prev => [...prev, botMsg]);
-
+            setMessages((prev) => [
+                ...prev,
+                { id: (Date.now() + 1).toString(), role: "bot", text: botText },
+            ]);
         } catch (error) {
             console.error(error);
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'bot',
-                text: 'Lo siento, hubo un problema al conectar con el servidor. Por favor intenta de nuevo.'
-            }]);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: Date.now().toString(),
+                    role: "bot",
+                    text: "Lo siento, hubo un problema al conectar. Por favor intenta de nuevo.",
+                },
+            ]);
         } finally {
             setIsLoading(false);
             isSendingRef.current = false;
@@ -573,8 +651,8 @@ export default function ChatWidget({
 
         const userMsg: Message = {
             id: Date.now().toString(),
-            role: 'user',
-            text: userText
+            role: "user",
+            text: userText,
         };
 
         setMessages(prev => [...prev, userMsg]);
@@ -599,7 +677,10 @@ export default function ChatWidget({
         <div className="fixed bottom-6 right-4 sm:right-6 z-[60] flex flex-col items-end gap-4">
             {!isOpen && (
                 <div
-                    className={`absolute bottom-20 right-0 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-100 whitespace-nowrap transition-all duration-500 transform ${showTooltip ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+                    className={`absolute bottom-20 right-0 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-100 whitespace-nowrap transition-all duration-500 transform ${showTooltip
+                        ? "opacity-100 translate-y-0"
+                        : "opacity-0 translate-y-4 pointer-events-none"
+                        }`}
                 >
                     <div className="text-gray-700 font-medium text-sm">
                         👋 ¿Necesitas ayuda con algo?
@@ -630,12 +711,20 @@ export default function ChatWidget({
 
                     <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0 rounded-t-lg">
                         <div className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
                                 <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                             </svg>
-                            <span className="font-semibold text-lg">
-                                Asistente Virtual
-                            </span>
+                            <span className="font-semibold text-lg">Asistente Virtual</span>
                         </div>
                         <button
                             onClick={() => setIsOpen(false)}
@@ -643,7 +732,17 @@ export default function ChatWidget({
                             aria-label="Cerrar chat"
                             type="button"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
                                 <path d="M18 6 6 18" />
                                 <path d="m6 6 12 12" />
                             </svg>
@@ -655,7 +754,8 @@ export default function ChatWidget({
                             {messages.map((msg) => (
                                 <div
                                     key={msg.id}
-                                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                                        }`}
                                 >
                                     <div
                                         className={`max-w-[80%] rounded-2xl text-sm overflow-hidden ${msg.role === 'user'
@@ -699,102 +799,105 @@ export default function ChatWidget({
                                     >×</button>
                                 </div>
                             )}
-                            <form onSubmit={handleSendMessage} className="flex gap-1.5 items-center">
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handleImageSelect}
-                                />
-                                {!isRecording && (
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="p-2 text-gray-400 hover:text-[#1B8BCC] transition-colors shrink-0"
-                                        aria-label="Adjuntar imagen"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                                        </svg>
-                                    </button>
-                                )}
-                                {isRecording ? (
-                                    <div className="flex items-center gap-2 flex-1 px-1">
+                            {/* Input */}
+                            <div className="p-3 bg-white border-t border-gray-200">
+                                <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleImageSelect}
+                                    />
+                                    {!isRecording && (
                                         <button
                                             type="button"
-                                            onClick={cancelRecording}
-                                            className="p-1 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors shrink-0"
-                                            title="Cancelar grabación"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="p-2 text-gray-400 hover:text-[#1B8BCC] transition-colors shrink-0"
+                                            aria-label="Adjuntar imagen"
                                         >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <polyline points="3 6 5 6 21 6"></polyline>
-                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                                             </svg>
                                         </button>
-                                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
-                                        <div className="flex items-center justify-between flex-1 h-8">
-                                            {waveformBars.map((scale, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="w-[2px] h-full bg-red-400 rounded-full"
-                                                    style={{ transform: `scaleY(${scale})`, transformOrigin: 'center' }}
-                                                />
-                                            ))}
+                                    )}
+                                    {isRecording ? (
+                                        <div className="flex items-center gap-2 flex-1 px-1">
+                                            <button
+                                                type="button"
+                                                onClick={cancelRecording}
+                                                className="p-1 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors shrink-0"
+                                                title="Cancelar grabación"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                                                </svg>
+                                            </button>
+                                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
+                                            <div className="flex items-center justify-between flex-1 h-8">
+                                                {waveformBars.map((scale, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className="w-[2px] h-full bg-red-400 rounded-full"
+                                                        style={{ transform: `scaleY(${scale})`, transformOrigin: 'center' }}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <span className="text-red-400 text-xs font-mono shrink-0 tabular-nums">
+                                                {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}
+                                            </span>
                                         </div>
-                                        <span className="text-red-400 text-xs font-mono shrink-0 tabular-nums">
-                                            {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}
-                                        </span>
-                                    </div>
-                                ) : (
-                                    <input
-                                        type="text"
-                                        value={inputValue}
-                                        onChange={(e) => setInputValue(e.target.value)}
-                                        placeholder="Escribe tu mensaje..."
-                                        className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"
-                                    />
-                                )}
-                                {!isRecording && (inputValue.trim() || pendingImage) ? (
-                                    <button
-                                        type="submit"
-                                        disabled={isLoading}
-                                        className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
-                                        aria-label="Enviar mensaje"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="m22 2-7 20-4-9-9-4Z" />
-                                            <path d="M22 2 11 13" />
-                                        </svg>
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={isRecording ? stopRecording : startRecording}
-                                        disabled={isLoading}
-                                        className={`p-2.5 rounded-full transition-colors shrink-0 flex items-center justify-center ${isRecording
-                                            ? 'bg-red-500 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-[#1B8BCC]'
-                                            }`}
-                                        title={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
-                                        aria-label={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
-                                    >
-                                        {isRecording ? (
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={inputValue}
+                                            onChange={(e) => setInputValue(e.target.value)}
+                                            placeholder="Escribe tu mensaje..."
+                                            className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"
+                                        />
+                                    )}
+                                    {!isRecording && (inputValue.trim() || pendingImage) ? (
+                                        <button
+                                            type="submit"
+                                            disabled={isLoading}
+                                            className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                                            aria-label="Enviar mensaje"
+                                        >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                                                <path d="m22 2-7 20-4-9-9-4Z" />
+                                                <path d="M22 2 11 13" />
                                             </svg>
-                                        ) : (
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                                                <line x1="12" x2="12" y1="19" y2="22" />
-                                            </svg>
-                                        )}
-                                    </button>
-                                )}
-                            </form>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={isRecording ? stopRecording : startRecording}
+                                            disabled={isLoading}
+                                            className={`p-2.5 rounded-full transition-colors shrink-0 flex items-center justify-center ${isRecording
+                                                ? 'bg-red-500 text-white'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-[#1B8BCC]'
+                                                }`}
+                                            title={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
+                                            aria-label={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
+                                        >
+                                            {isRecording ? (
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                                                </svg>
+                                            ) : (
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                                    <line x1="12" x2="12" y1="19" y2="22" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                    )}
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -804,10 +907,20 @@ export default function ChatWidget({
                 <button
                     onClick={toggleOpen}
                     className="bg-[#1B8BCC] text-white p-4 rounded-full shadow-lg hover:bg-[#1676ad] transition-all hover:scale-110 active:scale-95 flex items-center justify-center animate-bounce-subtle"
-                    aria-label="Abrir opciones de ayuda"
-                    style={{ width: '60px', height: '60px' }}
+                    aria-label="Abrir asistente"
+                    style={{ width: "60px", height: "60px" }}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
                         <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                     </svg>
                 </button>
