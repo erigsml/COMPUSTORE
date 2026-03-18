@@ -1,11 +1,60 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
+
+function getCookie(name: string): string | null {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+    return match ? match[2] : null;
+}
+
+function setCookie(name: string, value: string, days: number) {
+    const expires = new Date();
+    expires.setDate(expires.getDate() + days);
+    document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+}
+
+async function getOrCreateDeviceId(): Promise<string> {
+    const COOKIE_KEY = "dox_did";
+    const LS_KEY = "dox_did";
+
+    const fromCookie = getCookie(COOKIE_KEY);
+    if (fromCookie) return fromCookie;
+
+    const fromLS = localStorage.getItem(LS_KEY);
+    if (fromLS) {
+        setCookie(COOKIE_KEY, fromLS, 30);
+        return fromLS;
+    }
+
+    try {
+        const fpUrl = "https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.esm.min.js";
+        const FingerprintJS = await import(/* webpackIgnore: true */ fpUrl);
+        const fp = await FingerprintJS.load();
+        const result = await fp.get();
+        const visitorId = result.visitorId;
+        setCookie(COOKIE_KEY, visitorId, 30);
+        localStorage.setItem(LS_KEY, visitorId);
+        return visitorId;
+    } catch {
+        const generateFallbackId = () => {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        };
+        const fallback = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : generateFallbackId();
+        setCookie(COOKIE_KEY, fallback, 30);
+        localStorage.setItem(LS_KEY, fallback);
+        return fallback;
+    }
+}
 
 type Message = {
     id: string;
-    role: 'user' | 'bot';
+    role: "user" | "bot";
     text: string;
     audioUrl?: string;
     imageUrl?: string;
@@ -115,8 +164,8 @@ function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean 
                     <div
                         key={i}
                         className={`flex-1 rounded-full transition-colors duration-150 ${i < playedBars
-                                ? (isUser ? 'bg-white' : 'bg-[#1B8BCC]')
-                                : (isUser ? 'bg-white/35' : 'bg-gray-300')
+                            ? (isUser ? 'bg-white' : 'bg-[#1B8BCC]')
+                            : (isUser ? 'bg-white/35' : 'bg-gray-300')
                             }`}
                         style={{ height: `${Math.round(h * 26 + 4)}px` }}
                     />
@@ -177,24 +226,32 @@ const compressImage = async (file: File): Promise<File> => {
 
 export default function ChatWidget({
     isOpen: externalIsOpen,
-    setIsOpen: externalSetIsOpen
+    setIsOpen: externalSetIsOpen,
 }: {
     isOpen?: boolean;
     setIsOpen?: (value: boolean) => void;
 } = {}) {
     const [internalIsOpen, setInternalIsOpen] = useState(false);
     const [showTooltip, setShowTooltip] = useState(false);
-    const [view, setView] = useState<'menu' | 'chat'>('chat');
 
     const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
     const setIsOpen = externalSetIsOpen || setInternalIsOpen;
 
+    const [sessionId, setSessionId] = useState<string>("");
+
+    useEffect(() => {
+        getOrCreateDeviceId().then(setSessionId);
+    }, []);
+
     const [messages, setMessages] = useState<Message[]>([
-        { id: '1', role: 'bot', text: '¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?' }
+        {
+            id: "1",
+            role: "bot",
+            text: "¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?",
+        },
     ]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [sessionId] = useState(() => Math.random().toString(36).substring(7));
 
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -228,7 +285,7 @@ export default function ChatWidget({
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, view]);
+    }, [messages]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -237,7 +294,6 @@ export default function ChatWidget({
                 setTimeout(() => setShowTooltip(false), 5000);
             }
         }, 15000);
-
         return () => clearInterval(interval);
     }, [isOpen]);
 
@@ -305,6 +361,7 @@ export default function ChatWidget({
             const formData = new FormData();
             formData.append('image', compressedFile, compressedFile.name);
             formData.append('sessionId', sessionId);
+            formData.append('userAgent', navigator.userAgent);
             formData.append('type', 'image');
             if (caption) formData.append('caption', caption);
 
@@ -350,6 +407,7 @@ export default function ChatWidget({
             const formData = new FormData();
             formData.append('audio', audioBlob, 'audio.webm');
             formData.append('sessionId', sessionId);
+            formData.append('userAgent', navigator.userAgent);
             formData.append('type', 'audio');
 
             const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {
@@ -488,40 +546,49 @@ export default function ChatWidget({
     const sendBatchedMessages = async (messagesToSend: Message[]) => {
         if (messagesToSend.length === 0 || isLoading || isSendingRef.current) return;
 
+        if (!sessionId) return;
+
         isSendingRef.current = true;
         setIsLoading(true);
 
         try {
-            const combinedMessage = messagesToSend.map(msg => msg.text).join('\n\n');
+            const combinedMessage = messagesToSend.map((m) => m.text).join("\n\n");
 
-            const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chatInput: combinedMessage, sessionId })
-            });
+            const response = await fetch(
+                "https://n8n.mediclick.us/webhook/7a795449-952f-488c-a668-6716d3f37318",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        chatInput: combinedMessage,
+                        sessionId,
+                        userAgent: navigator.userAgent,
+                    }),
+                }
+            );
 
-            if (!response.ok) throw new Error('Error de conexión');
+            if (!response.ok) throw new Error("Error de conexión");
 
             const responseText = await response.text();
             if (!responseText) {
-                console.warn('Servidor respondió sin contenido');
-                throw new Error('No se recibió respuesta del asistente.');
+                console.warn("Respuesta vacía del webhook. Es posible que el flujo esté demorando o el nodo Respond To Webhook no se haya ejecutado.");
+                return setMessages((prev) => [
+                    ...prev,
+                    { id: (Date.now() + 1).toString(), role: "bot", text: "Procesando... (El servidor recibió el mensaje pero no ha respondido con texto)." },
+                ]);
             }
 
             let botText = "Disculpa, no pude procesar eso.";
-            let data;
+            let data: any;
+
             try {
                 data = JSON.parse(responseText);
             } catch (e) {
                 console.error('Error al parsear JSON:', responseText);
-                botText = responseText;
-                const botMsg: Message = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'bot',
-                    text: botText
-                };
-                setMessages(prev => [...prev, botMsg]);
-                return;
+                return setMessages((prev) => [
+                    ...prev,
+                    { id: (Date.now() + 1).toString(), role: "bot", text: responseText }
+                ]);
             }
 
             if (data.response) {
@@ -536,20 +603,20 @@ export default function ChatWidget({
                 botText = data.text;
             }
 
-            const botMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'bot',
-                text: botText
-            };
-            setMessages(prev => [...prev, botMsg]);
-
+            setMessages((prev) => [
+                ...prev,
+                { id: (Date.now() + 1).toString(), role: "bot", text: botText },
+            ]);
         } catch (error) {
             console.error(error);
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'bot',
-                text: 'Lo siento, hubo un problema al conectar con el servidor. Por favor intenta de nuevo.'
-            }]);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: Date.now().toString(),
+                    role: "bot",
+                    text: "Lo siento, hubo un problema al conectar. Por favor intenta de nuevo.",
+                },
+            ]);
         } finally {
             setIsLoading(false);
             isSendingRef.current = false;
@@ -573,8 +640,8 @@ export default function ChatWidget({
 
         const userMsg: Message = {
             id: Date.now().toString(),
-            role: 'user',
-            text: userText
+            role: "user",
+            text: userText,
         };
 
         setMessages(prev => [...prev, userMsg]);
@@ -599,7 +666,10 @@ export default function ChatWidget({
         <div className="fixed bottom-6 right-4 sm:right-6 z-[60] flex flex-col items-end gap-4">
             {!isOpen && (
                 <div
-                    className={`absolute bottom-20 right-0 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-100 whitespace-nowrap transition-all duration-500 transform ${showTooltip ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+                    className={`absolute bottom-20 right-0 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-100 whitespace-nowrap transition-all duration-500 transform ${showTooltip
+                        ? "opacity-100 translate-y-0"
+                        : "opacity-0 translate-y-4 pointer-events-none"
+                        }`}
                 >
                     <div className="text-gray-700 font-medium text-sm">
                         👋 ¿Necesitas ayuda con algo?
@@ -630,12 +700,20 @@ export default function ChatWidget({
 
                     <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0 rounded-t-lg">
                         <div className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
                                 <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                             </svg>
-                            <span className="font-semibold text-lg">
-                                Asistente Virtual
-                            </span>
+                            <span className="font-semibold text-lg">Asistente Virtual</span>
                         </div>
                         <button
                             onClick={() => setIsOpen(false)}
@@ -643,7 +721,17 @@ export default function ChatWidget({
                             aria-label="Cerrar chat"
                             type="button"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
                                 <path d="M18 6 6 18" />
                                 <path d="m6 6 12 12" />
                             </svg>
@@ -655,7 +743,8 @@ export default function ChatWidget({
                             {messages.map((msg) => (
                                 <div
                                     key={msg.id}
-                                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                                        }`}
                                 >
                                     <div
                                         className={`max-w-[80%] rounded-2xl text-sm overflow-hidden ${msg.role === 'user'
@@ -804,10 +893,20 @@ export default function ChatWidget({
                 <button
                     onClick={toggleOpen}
                     className="bg-[#1B8BCC] text-white p-4 rounded-full shadow-lg hover:bg-[#1676ad] transition-all hover:scale-110 active:scale-95 flex items-center justify-center animate-bounce-subtle"
-                    aria-label="Abrir opciones de ayuda"
-                    style={{ width: '60px', height: '60px' }}
+                    aria-label="Abrir asistente"
+                    style={{ width: "60px", height: "60px" }}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
                         <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                     </svg>
                 </button>
