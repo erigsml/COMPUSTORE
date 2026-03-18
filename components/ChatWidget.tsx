@@ -7,7 +7,134 @@ type Message = {
     id: string;
     role: 'user' | 'bot';
     text: string;
+    audioUrl?: string;
 };
+
+function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean }) {
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const rafRef = useRef<number | null>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+
+    const startRAF = () => {
+        const tick = () => {
+            if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
+            rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+    };
+
+    const stopRAF = () => {
+        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    };
+
+    useEffect(() => () => stopRAF(), []);
+
+    const BAR_COUNT = 30;
+    const [bars, setBars] = useState<number[]>(Array(BAR_COUNT).fill(0.15));
+
+    useEffect(() => {
+        const analyze = async () => {
+            try {
+                const res = await fetch(audioUrl);
+                const arrayBuffer = await res.arrayBuffer();
+                const ctx = new AudioContext();
+                const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                const channelData = audioBuffer.getChannelData(0);
+                const samplesPerBar = Math.floor(channelData.length / BAR_COUNT);
+                const amplitudes = Array.from({ length: BAR_COUNT }, (_, i) => {
+                    let sum = 0;
+                    for (let j = i * samplesPerBar; j < (i + 1) * samplesPerBar; j++) {
+                        sum += Math.abs(channelData[j]);
+                    }
+                    return sum / samplesPerBar;
+                });
+                const max = Math.max(...amplitudes, 0.001);
+                setBars(amplitudes.map(v => Math.max(0.08, v / max)));
+                ctx.close();
+            } catch {
+                // fallback: keep default bars
+            }
+        };
+        analyze();
+    }, [audioUrl]);
+
+    const progress = duration > 0 ? currentTime / duration : 0;
+    const playedBars = Math.round(progress * BAR_COUNT);
+
+    const formatTime = (s: number) => {
+        if (!isFinite(s) || isNaN(s)) return '0:00';
+        return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+    };
+
+    const togglePlay = () => {
+        if (!audioRef.current) return;
+        isPlaying ? audioRef.current.pause() : audioRef.current.play();
+    };
+
+    const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!audioRef.current || !duration) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        audioRef.current.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
+    };
+
+    return (
+        <div className="flex items-center gap-2.5 py-0.5" style={{ minWidth: '210px' }}>
+            <audio
+                ref={audioRef}
+                src={audioUrl}
+                onPlay={() => { setIsPlaying(true); startRAF(); }}
+                onPause={() => { setIsPlaying(false); stopRAF(); }}
+                onEnded={() => { setIsPlaying(false); stopRAF(); setCurrentTime(0); }}
+                onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
+            />
+
+            {/* Play/Pause */}
+            <button
+                onClick={togglePlay}
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                    isUser ? 'bg-white/20 hover:bg-white/35' : 'bg-[#1B8BCC]/15 hover:bg-[#1B8BCC]/25'
+                }`}
+            >
+                {isPlaying ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="5" y="4" width="4" height="16" rx="1" />
+                        <rect x="15" y="4" width="4" height="16" rx="1" />
+                    </svg>
+                ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: '2px' }}>
+                        <polygon points="5,3 19,12 5,21" />
+                    </svg>
+                )}
+            </button>
+
+            {/* Waveform bars */}
+            <div
+                className="flex items-center gap-[2px] flex-1 h-8 cursor-pointer"
+                onClick={handleSeek}
+            >
+                {bars.map((h, i) => (
+                    <div
+                        key={i}
+                        className={`flex-1 rounded-full transition-colors duration-150 ${
+                            i < playedBars
+                                ? (isUser ? 'bg-white' : 'bg-[#1B8BCC]')
+                                : (isUser ? 'bg-white/35' : 'bg-gray-300')
+                        }`}
+                        style={{ height: `${Math.round(h * 26 + 4)}px` }}
+                    />
+                ))}
+            </div>
+
+            {/* Timer */}
+            <span className={`text-[11px] font-mono tabular-nums shrink-0 ${isUser ? 'text-white/75' : 'text-gray-400'}`}>
+                {formatTime(isPlaying || currentTime > 0 ? currentTime : duration)}
+            </span>
+        </div>
+    );
+}
+
 
 export default function ChatWidget({
     isOpen: externalIsOpen,
@@ -36,6 +163,12 @@ export default function ChatWidget({
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<BlobPart[]>([]);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+    const [waveformBars, setWaveformBars] = useState<number[]>(Array(32).fill(0.08));
+    const [recordingTime, setRecordingTime] = useState(0);
+    const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Message batching state
     const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
@@ -69,12 +202,13 @@ export default function ChatWidget({
         return () => clearInterval(interval);
     }, [isOpen]);
 
-    // Cleanup timeout on unmount
+    // Cleanup on unmount
     useEffect(() => {
         return () => {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            }
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            if (audioContextRef.current) audioContextRef.current.close();
+            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
         };
     }, []);
 
@@ -84,9 +218,8 @@ export default function ChatWidget({
         isSendingRef.current = true;
         setIsLoading(true);
 
-        // Show temporary message
-        const tempMsgId = Date.now().toString();
-        setMessages(prev => [...prev, { id: tempMsgId, role: 'user', text: '🎤 Mensaje de voz enviado...' }]);
+        const audioUrl = URL.createObjectURL(audioBlob);
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: '', audioUrl }]);
 
         try {
             const formData = new FormData();
@@ -95,7 +228,7 @@ export default function ChatWidget({
             // Opcional para distinguir en n8n
             formData.append('type', 'audio');
 
-            const response = await fetch('http://63.180.73.191:5678/webhook-test/927f706e-189f-45fe-934a-fd7499590e14', {
+            const response = await fetch('https://n8n.mediclick.us/webhook-test/927f706e-189f-45fe-934a-fd7499590e14', {
                 method: 'POST',
                 // Content-Type is set automatically by the browser for FormData
                 body: formData
@@ -140,6 +273,35 @@ export default function ChatWidget({
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            // Set up audio analysis for waveform visualization
+            const audioContext = new AudioContext();
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 128;
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            audioContextRef.current = audioContext;
+            analyserRef.current = analyser;
+
+            const BAR_COUNT = 32;
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            let smoothed = Array(BAR_COUNT).fill(0.08);
+            const animate = () => {
+                analyser.getByteFrequencyData(dataArray);
+                smoothed = smoothed.map((curr, i) => {
+                    const index = Math.floor(i * dataArray.length / BAR_COUNT);
+                    const target = Math.max(0.08, dataArray[index] / 255);
+                    return curr + (target - curr) * 0.25; // lerp suavizado
+                });
+                setWaveformBars([...smoothed]);
+                animationFrameRef.current = requestAnimationFrame(animate);
+            };
+            animate();
+
+            // Start recording timer
+            setRecordingTime(0);
+            recordingTimerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
+
             const mediaRecorder = new MediaRecorder(stream);
             mediaRecorderRef.current = mediaRecorder;
             audioChunksRef.current = [];
@@ -168,6 +330,11 @@ export default function ChatWidget({
         if (mediaRecorderRef.current && isRecording) {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
+            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            if (audioContextRef.current) audioContextRef.current.close();
+            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+            setWaveformBars(Array(32).fill(0.08));
+            setRecordingTime(0);
         }
     };
 
@@ -338,12 +505,16 @@ export default function ChatWidget({
                                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     <div
-                                        className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user'
+                                        className={`max-w-[80%] rounded-2xl text-sm ${msg.role === 'user'
                                             ? 'bg-[#1B8BCC] text-white rounded-br-none'
                                             : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
-                                            }`}
+                                            } ${msg.audioUrl ? 'p-1.5' : 'p-3'}`}
                                     >
-                                        {msg.text}
+                                        {msg.audioUrl ? (
+                                            <AudioMessage audioUrl={msg.audioUrl} isUser={msg.role === 'user'} />
+                                        ) : (
+                                            msg.text
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -362,15 +533,32 @@ export default function ChatWidget({
                         {/* Input Area */}
                         <div className="p-3 bg-white border-t border-gray-200">
                             <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
-                                <input
-                                    type="text"
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    placeholder={isRecording ? "Grabando audio..." : "Escribe tu mensaje..."}
-                                    disabled={isRecording}
-                                    className={`flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800 ${isRecording ? 'bg-red-50 text-red-600 placeholder-red-400 border-red-200' : ''}`}
-                                />
-                                {inputValue.trim() ? (
+                                {isRecording ? (
+                                    <div className="flex items-center gap-2 flex-1 px-1">
+                                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
+                                        <div className="flex items-center justify-between flex-1 h-8">
+                                            {waveformBars.map((scale, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="w-[2px] h-full bg-red-400 rounded-full"
+                                                    style={{ transform: `scaleY(${scale})`, transformOrigin: 'center' }}
+                                                />
+                                            ))}
+                                        </div>
+                                        <span className="text-red-400 text-xs font-mono shrink-0 tabular-nums">
+                                            {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={inputValue}
+                                        onChange={(e) => setInputValue(e.target.value)}
+                                        placeholder="Escribe tu mensaje..."
+                                        className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"
+                                    />
+                                )}
+                                {!isRecording && inputValue.trim() ? (
                                     <button
                                         type="submit"
                                         disabled={isLoading || !inputValue.trim()}
@@ -388,7 +576,7 @@ export default function ChatWidget({
                                         onClick={isRecording ? stopRecording : startRecording}
                                         disabled={isLoading}
                                         className={`p-2.5 rounded-full transition-colors shrink-0 flex items-center justify-center ${isRecording
-                                            ? 'bg-red-500 text-white animate-pulse'
+                                            ? 'bg-red-500 text-white'
                                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-[#1B8BCC]'
                                             }`}
                                         title={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}

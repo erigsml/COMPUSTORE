@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:/Users/USUARIO/Documents/PROYECTO_DOX/COMPUSTORE\" checkout audio)"
+    ]
+  }
+}
