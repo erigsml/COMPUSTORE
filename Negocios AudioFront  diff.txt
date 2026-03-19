@@ -1,0 +1,1010 @@
+[1mdiff --git a/.claude/settings.local.json b/.claude/settings.local.json[m
+[1mnew file mode 100644[m
+[1mindex 0000000..b63dfa1[m
+[1m--- /dev/null[m
+[1m+++ b/.claude/settings.local.json[m
+[36m@@ -0,0 +1,7 @@[m
+[32m+[m[32m{[m
+[32m+[m[32m  "permissions": {[m
+[32m+[m[32m    "allow": [[m
+[32m+[m[32m      "Bash(git -C \"c:/Users/USUARIO/Documents/PROYECTO_DOX/COMPUSTORE\" checkout audio)"[m
+[32m+[m[32m    ][m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[1mdiff --git a/components/ChatWidget.tsx b/components/ChatWidget.tsx[m
+[1mindex 7d1d125..395795e 100644[m
+[1m--- a/components/ChatWidget.tsx[m
+[1m+++ b/components/ChatWidget.tsx[m
+[36m@@ -17,165 +17,913 @@[m [mfunction setCookie(name: string, value: string, days: number) {[m
+ async function getOrCreateDeviceId(): Promise<string> {[m
+     const COOKIE_KEY = "dox_did";[m
+     const LS_KEY = "dox_did";[m
+[32m+[m
+     const fromCookie = getCookie(COOKIE_KEY);[m
+     if (fromCookie) return fromCookie;[m
+[32m+[m
+     const fromLS = localStorage.getItem(LS_KEY);[m
+[31m-    if (fromLS) { setCookie(COOKIE_KEY, fromLS, 30); return fromLS; }[m
+[32m+[m[32m    if (fromLS) {[m
+[32m+[m[32m        setCookie(COOKIE_KEY, fromLS, 30);[m
+[32m+[m[32m        return fromLS;[m
+[32m+[m[32m    }[m
+[32m+[m
+     try {[m
+[31m-        const FingerprintJS = await import("https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.esm.min.js" as any);[m
+[32m+[m[32m        const fpUrl = "https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@4/dist/fp.esm.min.js";[m
+[32m+[m[32m        const FingerprintJS = await import(/* webpackIgnore: true */ fpUrl);[m
+         const fp = await FingerprintJS.load();[m
+         const result = await fp.get();[m
+[31m-        setCookie(COOKIE_KEY, result.visitorId, 30);[m
+[31m-        localStorage.setItem(LS_KEY, result.visitorId);[m
+[31m-        return result.visitorId;[m
+[32m+[m[32m        const visitorId = result.visitorId;[m
+[32m+[m[32m        setCookie(COOKIE_KEY, visitorId, 30);[m
+[32m+[m[32m        localStorage.setItem(LS_KEY, visitorId);[m
+[32m+[m[32m        return visitorId;[m
+     } catch {[m
+[31m-        const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === "x" ? r : (r & 0x3) | 0x8).toString(16); });[m
+[31m-        setCookie(COOKIE_KEY, id, 30);[m
+[31m-        localStorage.setItem(LS_KEY, id);[m
+[31m-        return id;[m
+[32m+[m[32m        const generateFallbackId = () => {[m
+[32m+[m[32m            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {[m
+[32m+[m[32m                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);[m
+[32m+[m[32m                return v.toString(16);[m
+[32m+[m[32m            });[m
+[32m+[m[32m        };[m
+[32m+[m[32m        const fallback = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'[m
+[32m+[m[32m            ? crypto.randomUUID()[m
+[32m+[m[32m            : generateFallbackId();[m
+[32m+[m[32m        setCookie(COOKIE_KEY, fallback, 30);[m
+[32m+[m[32m        localStorage.setItem(LS_KEY, fallback);[m
+[32m+[m[32m        return fallback;[m
+     }[m
+ }[m
+ [m
+[31m-type Message = { id: string; role: "user" | "bot"; text: string };[m
+[32m+[m[32mtype Message = {[m
+[32m+[m[32m    id: string;[m
+[32m+[m[32m    role: "user" | "bot";[m
+[32m+[m[32m    text: string;[m
+[32m+[m[32m    audioUrl?: string;[m
+[32m+[m[32m    imageUrl?: string;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mfunction AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean }) {[m
+[32m+[m[32m    const audioRef = useRef<HTMLAudioElement>(null);[m
+[32m+[m[32m    const rafRef = useRef<number | null>(null);[m
+[32m+[m[32m    const [isPlaying, setIsPlaying] = useState(false);[m
+[32m+[m[32m    const [currentTime, setCurrentTime] = useState(0);[m
+[32m+[m[32m    const [duration, setDuration] = useState(0);[m
+[32m+[m
+[32m+[m[32m    const startRAF = () => {[m
+[32m+[m[32m        const tick = () => {[m
+[32m+[m[32m            if (audioRef.current) setCurrentTime(audioRef.current.currentTime);[m
+[32m+[m[32m            rafRef.current = requestAnimationFrame(tick);[m
+[32m+[m[32m        };[m
+[32m+[m[32m        rafRef.current = requestAnimationFrame(tick);[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const stopRAF = () => {[m
+[32m+[m[32m        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    useEffect(() => () => stopRAF(), []);[m
+[32m+[m
+[32m+[m[32m    const BAR_COUNT = 30;[m
+[32m+[m[32m    const [bars, setBars] = useState<number[]>(Array(BAR_COUNT).fill(0.15));[m
+[32m+[m
+[32m+[m[32m    useEffect(() => {[m
+[32m+[m[32m        const analyze = async () => {[m
+[32m+[m[32m            try {[m
+[32m+[m[32m                const res = await fetch(audioUrl);[m
+[32m+[m[32m                const arrayBuffer = await res.arrayBuffer();[m
+[32m+[m[32m                const ctx = new AudioContext();[m
+[32m+[m[32m                const audioBuffer = await ctx.decodeAudioData(arrayBuffer);[m
+[32m+[m[32m                const channelData = audioBuffer.getChannelData(0);[m
+[32m+[m[32m                const samplesPerBar = Math.floor(channelData.length / BAR_COUNT);[m
+[32m+[m[32m                const amplitudes = Array.from({ length: BAR_COUNT }, (_, i) => {[m
+[32m+[m[32m                    let sum = 0;[m
+[32m+[m[32m                    for (let j = i * samplesPerBar; j < (i + 1) * samplesPerBar; j++) {[m
+[32m+[m[32m                        sum += Math.abs(channelData[j]);[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                    return sum / samplesPerBar;[m
+[32m+[m[32m                });[m
+[32m+[m[32m                const max = Math.max(...amplitudes, 0.001);[m
+[32m+[m[32m                setBars(amplitudes.map(v => Math.max(0.08, v / max)));[m
+[32m+[m[32m                ctx.close();[m
+[32m+[m[32m            } catch {[m
+[32m+[m[32m            }[m
+[32m+[m[32m        };[m
+[32m+[m[32m        analyze();[m
+[32m+[m[32m    }, [audioUrl]);[m
+[32m+[m
+[32m+[m[32m    const progress = duration > 0 ? currentTime / duration : 0;[m
+[32m+[m[32m    const playedBars = Math.round(progress * BAR_COUNT);[m
+[32m+[m
+[32m+[m[32m    const formatTime = (s: number) => {[m
+[32m+[m[32m        if (!isFinite(s) || isNaN(s)) return '0:00';[m
+[32m+[m[32m        return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const togglePlay = () => {[m
+[32m+[m[32m        if (!audioRef.current) return;[m
+[32m+[m[32m        isPlaying ? audioRef.current.pause() : audioRef.current.play();[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {[m
+[32m+[m[32m        if (!audioRef.current || !duration) return;[m
+[32m+[m[32m        const rect = e.currentTarget.getBoundingClientRect();[m
+[32m+[m[32m        audioRef.current.currentTime = ((e.clientX - rect.left) / rect.width) * duration;[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    return ([m
+[32m+[m[32m        <div className="flex items-center gap-2.5 py-0.5" style={{ minWidth: '210px' }}>[m
+[32m+[m[32m            <audio[m
+[32m+[m[32m                ref={audioRef}[m
+[32m+[m[32m                src={audioUrl}[m
+[32m+[m[32m                onPlay={() => { setIsPlaying(true); startRAF(); }}[m
+[32m+[m[32m                onPause={() => { setIsPlaying(false); stopRAF(); }}[m
+[32m+[m[32m                onEnded={() => { setIsPlaying(false); stopRAF(); setCurrentTime(0); }}[m
+[32m+[m[32m                onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}[m
+[32m+[m[32m            />[m
+[32m+[m
+[32m+[m[32m            <button[m
+[32m+[m[32m                onClick={togglePlay}[m
+[32m+[m[32m                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isUser ? 'bg-white/20 hover:bg-white/35' : 'bg-[#1B8BCC]/15 hover:bg-[#1B8BCC]/25'[m
+[32m+[m[32m                    }`}[m
+[32m+[m[32m            >[m
+[32m+[m[32m                {isPlaying ? ([m
+[32m+[m[32m                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">[m
+[32m+[m[32m                        <rect x="5" y="4" width="4" height="16" rx="1" />[m
+[32m+[m[32m                        <rect x="15" y="4" width="4" height="16" rx="1" />[m
+[32m+[m[32m                    </svg>[m
+[32m+[m[32m                ) : ([m
+[32m+[m[32m                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: '2px' }}>[m
+[32m+[m[32m                        <polygon points="5,3 19,12 5,21" />[m
+[32m+[m[32m                    </svg>[m
+[32m+[m[32m                )}[m
+[32m+[m[32m            </button>[m
+[32m+[m
+[32m+[m[32m            <div[m
+[32m+[m[32m                className="flex items-center gap-[2px] flex-1 h-8 cursor-pointer"[m
+[32m+[m[32m                onClick={handleSeek}[m
+[32m+[m[32m            >[m
+[32m+[m[32m                {bars.map((h, i) => ([m
+[32m+[m[32m                    <div[m
+[32m+[m[32m                        key={i}[m
+[32m+[m[32m                        className={`flex-1 rounded-full transition-colors duration-150 ${i < playedBars[m
+[32m+[m[32m                            ? (isUser ? 'bg-white' : 'bg-[#1B8BCC]')[m
+[32m+[m[32m                            : (isUser ? 'bg-white/35' : 'bg-gray-300')[m
+[32m+[m[32m                            }`}[m
+[32m+[m[32m                        style={{ height: `${Math.round(h * 26 + 4)}px` }}[m
+[32m+[m[32m                    />[m
+[32m+[m[32m                ))}[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <span className={`text-[11px] font-mono tabular-nums shrink-0 ${isUser ? 'text-white/75' : 'text-gray-400'}`}>[m
+[32m+[m[32m                {formatTime(isPlaying || currentTime > 0 ? currentTime : duration)}[m
+[32m+[m[32m            </span>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m    );[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m
+[32m+[m[32mconst compressImage = async (file: File): Promise<File> => {[m
+[32m+[m[32m    return new Promise((resolve, reject) => {[m
+[32m+[m[32m        const reader = new FileReader();[m
+[32m+[m[32m        reader.readAsDataURL(file);[m
+[32m+[m[32m        reader.onload = (event) => {[m
+[32m+[m[32m            const img = new window.Image();[m
+[32m+[m[32m            img.src = event.target?.result as string;[m
+[32m+[m[32m            img.onload = () => {[m
+[32m+[m[32m                const cvs = document.createElement('canvas');[m
+[32m+[m[32m                const MAX_WIDTH = 1200;[m
+[32m+[m[32m                const MAX_HEIGHT = 1200;[m
+[32m+[m[32m                let width = img.width;[m
+[32m+[m[32m                let height = img.height;[m
+[32m+[m
+[32m+[m[32m                if (width > height) {[m
+[32m+[m[32m                    if (width > MAX_WIDTH) {[m
+[32m+[m[32m                        height *= MAX_WIDTH / width;[m
+[32m+[m[32m                        width = MAX_WIDTH;[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                } else {[m
+[32m+[m[32m                    if (height > MAX_HEIGHT) {[m
+[32m+[m[32m                        width *= MAX_HEIGHT / height;[m
+[32m+[m[32m                        height = MAX_HEIGHT;[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                }[m
+[32m+[m
+[32m+[m[32m                cvs.width = width;[m
+[32m+[m[32m                cvs.height = height;[m
+[32m+[m[32m                const ctx = cvs.getContext('2d');[m
+[32m+[m[32m                ctx?.drawImage(img, 0, 0, width, height);[m
+[32m+[m[32m                cvs.toBlob((blob) => {[m
+[32m+[m[32m                    if (blob) {[m
+[32m+[m[32m                        resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' }));[m
+[32m+[m[32m                    } else {[m
+[32m+[m[32m                        reject(new Error('Compresión fallida'));[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                }, 'image/jpeg', 0.7);[m
+[32m+[m[32m            };[m
+[32m+[m[32m            img.onerror = () => reject(new Error('Error al cargar la imagen'));[m
+[32m+[m[32m        };[m
+[32m+[m[32m        reader.onerror = () => reject(new Error('Error al leer el archivo'));[m
+[32m+[m[32m    });[m
+[32m+[m[32m};[m
+ [m
+ export default function ChatWidget({[m
+[31m-    apiKey = "biz_clinica",[m
+[31m-    webhookUrl = "https://n8n.mediclick.us/webhook/7a795449-952f-488c-a668-6716d3f37318",[m
+     isOpen: externalIsOpen,[m
+     setIsOpen: externalSetIsOpen,[m
+ }: {[m
+[31m-    apiKey?: string;[m
+[31m-    webhookUrl?: string;[m
+     isOpen?: boolean;[m
+     setIsOpen?: (value: boolean) => void;[m
+ } = {}) {[m
+     const [internalIsOpen, setInternalIsOpen] = useState(false);[m
+     const [showTooltip, setShowTooltip] = useState(false);[m
+[32m+[m
+     const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;[m
+     const setIsOpen = externalSetIsOpen || setInternalIsOpen;[m
+ [m
+     const [sessionId, setSessionId] = useState<string>("");[m
+[31m-    const [messages, setMessages] = useState<Message[]>([{ id: "1", role: "bot", text: "¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?" }]);[m
+[32m+[m
+[32m+[m[32m    useEffect(() => {[m
+[32m+[m[32m        getOrCreateDeviceId().then(setSessionId);[m
+[32m+[m[32m    }, []);[m
+[32m+[m
+[32m+[m[32m    const [messages, setMessages] = useState<Message[]>([[m
+[32m+[m[32m        {[m
+[32m+[m[32m            id: "1",[m
+[32m+[m[32m            role: "bot",[m
+[32m+[m[32m            text: "¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?",[m
+[32m+[m[32m        },[m
+[32m+[m[32m    ]);[m
+     const [inputValue, setInputValue] = useState("");[m
+     const [isLoading, setIsLoading] = useState(false);[m
+[32m+[m
+[32m+[m[32m    const [isRecording, setIsRecording] = useState(false);[m
+[32m+[m[32m    const mediaRecorderRef = useRef<MediaRecorder | null>(null);[m
+[32m+[m[32m    const audioChunksRef = useRef<BlobPart[]>([]);[m
+[32m+[m[32m    const audioContextRef = useRef<AudioContext | null>(null);[m
+[32m+[m[32m    const analyserRef = useRef<AnalyserNode | null>(null);[m
+[32m+[m[32m    const animationFrameRef = useRef<number | null>(null);[m
+[32m+[m[32m    const [waveformBars, setWaveformBars] = useState<number[]>(Array(32).fill(0.08));[m
+[32m+[m[32m    const [recordingTime, setRecordingTime] = useState(0);[m
+[32m+[m[32m    const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);[m
+[32m+[m[32m    const cancelRecordingRef = useRef(false);[m
+[32m+[m
+     const [pendingMessages, setPendingMessages] = useState<Message[]>([]);[m
+     const timeoutRef = useRef<NodeJS.Timeout | null>(null);[m
+[32m+[m[32m    const BATCH_TIMEOUT = 500;[m
+     const isSendingRef = useRef(false);[m
+[32m+[m
+[32m+[m[32m    const fileInputRef = useRef<HTMLInputElement>(null);[m
+[32m+[m[32m    const [pendingImage, setPendingImage] = useState<File | null>(null);[m
+[32m+[m[32m    const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);[m
+[32m+[m[32m    const [isDraggingOver, setIsDraggingOver] = useState(false);[m
+[32m+[m[32m    const dragCounterRef = useRef(0);[m
+[32m+[m
+     const messagesEndRef = useRef<HTMLDivElement>(null);[m
+ [m
+[31m-    useEffect(() => { getOrCreateDeviceId().then(setSessionId); }, []);[m
+[31m-    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);[m
+[32m+[m[32m    const toggleOpen = () => setIsOpen(!isOpen);[m
+[32m+[m
+[32m+[m[32m    const scrollToBottom = () => {[m
+[32m+[m[32m        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    useEffect(() => {[m
+[32m+[m[32m        scrollToBottom();[m
+[32m+[m[32m    }, [messages]);[m
+[32m+[m
+     useEffect(() => {[m
+[31m-        const i = setInterval(() => { if (!isOpen) { setShowTooltip(true); setTimeout(() => setShowTooltip(false), 5000); } }, 15000);[m
+[31m-        return () => clearInterval(i);[m
+[32m+[m[32m        const interval = setInterval(() => {[m
+[32m+[m[32m            if (!isOpen) {[m
+[32m+[m[32m                setShowTooltip(true);[m
+[32m+[m[32m                setTimeout(() => setShowTooltip(false), 5000);[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }, 15000);[m
+[32m+[m[32m        return () => clearInterval(interval);[m
+     }, [isOpen]);[m
+[31m-    useEffect(() => { return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }; }, []);[m
+ [m
+[31m-    const sendBatchedMessages = async (messagesToSend: Message[]) => {[m
+[31m-        if (!messagesToSend.length || isLoading || isSendingRef.current || !sessionId) return;[m
+[32m+[m[32m    useEffect(() => {[m
+[32m+[m[32m        return () => {[m
+[32m+[m[32m            if (timeoutRef.current) clearTimeout(timeoutRef.current);[m
+[32m+[m[32m            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);[m
+[32m+[m[32m            if (audioContextRef.current) audioContextRef.current.close();[m
+[32m+[m[32m            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);[m
+[32m+[m[32m        };[m
+[32m+[m[32m    }, []);[m
+[32m+[m
+[32m+[m[32m    const handleDragEnter = (e: React.DragEvent) => {[m
+[32m+[m[32m        e.preventDefault();[m
+[32m+[m[32m        dragCounterRef.current++;[m
+[32m+[m[32m        if (e.dataTransfer.types.includes('Files')) setIsDraggingOver(true);[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const handleDragLeave = (e: React.DragEvent) => {[m
+[32m+[m[32m        e.preventDefault();[m
+[32m+[m[32m        dragCounterRef.current--;[m
+[32m+[m[32m        if (dragCounterRef.current === 0) setIsDraggingOver(false);[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };[m
+[32m+[m
+[32m+[m[32m    const handleDrop = (e: React.DragEvent) => {[m
+[32m+[m[32m        e.preventDefault();[m
+[32m+[m[32m        dragCounterRef.current = 0;[m
+[32m+[m[32m        setIsDraggingOver(false);[m
+[32m+[m[32m        const file = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'));[m
+[32m+[m[32m        if (!file) return;[m
+[32m+[m[32m        if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl);[m
+[32m+[m[32m        setPendingImage(file);[m
+[32m+[m[32m        setPendingImageUrl(URL.createObjectURL(file));[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {[m
+[32m+[m[32m        const file = e.target.files?.[0];[m
+[32m+[m[32m        if (!file) return;[m
+[32m+[m[32m        if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl);[m
+[32m+[m[32m        setPendingImage(file);[m
+[32m+[m[32m        setPendingImageUrl(URL.createObjectURL(file));[m
+[32m+[m[32m        e.target.value = '';[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const clearPendingImage = () => {[m
+[32m+[m[32m        if (pendingImageUrl) URL.revokeObjectURL(pendingImageUrl);[m
+[32m+[m[32m        setPendingImage(null);[m
+[32m+[m[32m        setPendingImageUrl(null);[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const sendImageToN8N = async (imageFile: File, caption: string = '') => {[m
+[32m+[m[32m        isSendingRef.current = true;[m
+[32m+[m[32m        setIsLoading(true);[m
+[32m+[m
+[32m+[m[32m        const imageUrl = URL.createObjectURL(imageFile);[m
+[32m+[m[32m        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: caption, imageUrl }]);[m
+[32m+[m[32m        setInputValue('');[m
+[32m+[m[32m        clearPendingImage();[m
+[32m+[m
+[32m+[m[32m        try {[m
+[32m+[m[32m            const compressedFile = await compressImage(imageFile);[m
+[32m+[m
+[32m+[m[32m            const formData = new FormData();[m
+[32m+[m[32m            formData.append('image', compressedFile, compressedFile.name);[m
+[32m+[m[32m            formData.append('sessionId', sessionId);[m
+[32m+[m[32m            formData.append('userAgent', navigator.userAgent);[m
+[32m+[m[32m            formData.append('type', 'image');[m
+[32m+[m[32m            if (caption) formData.append('caption', caption);[m
+[32m+[m
+[32m+[m[32m            const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {[m
+[32m+[m[32m                method: 'POST',[m
+[32m+[m[32m                body: formData[m
+[32m+[m[32m            });[m
+[32m+[m
+[32m+[m[32m            if (!response.ok) throw new Error('Error de conexión');[m
+[32m+[m
+[32m+[m[32m            const responseText = await response.text();[m
+[32m+[m[32m            if (!responseText) throw new Error('Sin respuesta');[m
+[32m+[m
+[32m+[m[32m            let botText = "Disculpa, no pude procesar eso.";[m
+[32m+[m[32m            try {[m
+[32m+[m[32m                const data = JSON.parse(responseText);[m
+[32m+[m[32m                if (data.response) botText = data.response;[m
+[32m+[m[32m                else if (data.output) botText = data.output;[m
+[32m+[m[32m                else if (data.text) botText = data.text;[m
+[32m+[m[32m                else if (typeof data === 'string') botText = data;[m
+[32m+[m[32m            } catch { botText = responseText; }[m
+[32m+[m
+[32m+[m[32m            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'bot', text: botText }]);[m
+[32m+[m[32m        } catch (error) {[m
+[32m+[m[32m            console.error(error);[m
+[32m+[m[32m            setMessages(prev => [...prev, { id: Date.now().toString(), role: 'bot', text: 'Lo siento, hubo un problema al enviar la imagen.' }]);[m
+[32m+[m[32m        } finally {[m
+[32m+[m[32m            setIsLoading(false);[m
+[32m+[m[32m            isSendingRef.current = false;[m
+[32m+[m[32m        }[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const sendAudioToN8N = async (audioBlob: Blob) => {[m
+[32m+[m[32m        if (isLoading || isSendingRef.current) return;[m
+[32m+[m
+         isSendingRef.current = true;[m
+         setIsLoading(true);[m
+[32m+[m
+[32m+[m[32m        const audioUrl = URL.createObjectURL(audioBlob);[m
+[32m+[m[32m        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: '', audioUrl }]);[m
+[32m+[m
+         try {[m
+[31m-            const res = await fetch(webhookUrl, {[m
+[31m-                method: "POST",[m
+[31m-                headers: { "Content-Type": "application/json" },[m
+[31m-                body: JSON.stringify({[m
+[31m-                    chatInput: messagesToSend.map((m) => m.text).join("\n\n"),[m
+[31m-                    sessionId,[m
+[31m-                    apiKey,[m
+[31m-                    userAgent: navigator.userAgent,[m
+[31m-                }),[m
+[32m+[m[32m            const formData = new FormData();[m
+[32m+[m[32m            formData.append('audio', audioBlob, 'audio.webm');[m
+[32m+[m[32m            formData.append('sessionId', sessionId);[m
+[32m+[m[32m            formData.append('userAgent', navigator.userAgent);[m
+[32m+[m[32m            formData.append('type', 'audio');[m
+[32m+[m
+[32m+[m[32m            const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {[m
+[32m+[m[32m                method: 'POST',[m
+[32m+[m[32m                body: formData[m
+             });[m
+[31m-            if (!res.ok) throw new Error("Error de conexión");[m
+[31m-            const text = await res.text();[m
+[31m-            if (!text) { setMessages((p) => [...p, { id: Date.now().toString(), role: "bot", text: "Procesando..." }]); return; }[m
+[32m+[m
+[32m+[m[32m            if (!response.ok) throw new Error('Error de conexión');[m
+[32m+[m
+[32m+[m[32m            const responseText = await response.text();[m
+[32m+[m[32m            if (!responseText) throw new Error('No se recibió respuesta del asistente.');[m
+[32m+[m
+             let botText = "Disculpa, no pude procesar eso.";[m
+[32m+[m[32m            let data;[m
+             try {[m
+[31m-                const data = JSON.parse(text);[m
+[32m+[m[32m                data = JSON.parse(responseText);[m
+                 if (data.response) botText = data.response;[m
+                 else if (data.output) botText = data.output;[m
+[31m-                else if (typeof data === "string") botText = data;[m
+[32m+[m[32m                else if (typeof data === 'string') botText = data;[m
+                 else if (Array.isArray(data) && data[0]?.output) botText = data[0].output;[m
+                 else if (data.text) botText = data.text;[m
+[31m-            } catch { botText = text; }[m
+[31m-            setMessages((p) => [...p, { id: (Date.now() + 1).toString(), role: "bot", text: botText }]);[m
+[31m-        } catch {[m
+[31m-            setMessages((p) => [...p, { id: Date.now().toString(), role: "bot", text: "Lo siento, hubo un problema al conectar. Por favor intenta de nuevo." }]);[m
+[31m-        } finally { setIsLoading(false); isSendingRef.current = false; }[m
+[32m+[m[32m            } catch (e) {[m
+[32m+[m[32m                botText = responseText;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            setMessages(prev => [...prev, {[m
+[32m+[m[32m                id: (Date.now() + 1).toString(),[m
+[32m+[m[32m                role: 'bot',[m
+[32m+[m[32m                text: botText[m
+[32m+[m[32m            }]);[m
+[32m+[m[32m        } catch (error) {[m
+[32m+[m[32m            console.error(error);[m
+[32m+[m[32m            setMessages(prev => [...prev, {[m
+[32m+[m[32m                id: Date.now().toString(),[m
+[32m+[m[32m                role: 'bot',[m
+[32m+[m[32m                text: 'Lo siento, hubo un problema al enviar el audio. Por favor intenta de nuevo.'[m
+[32m+[m[32m            }]);[m
+[32m+[m[32m        } finally {[m
+[32m+[m[32m            setIsLoading(false);[m
+[32m+[m[32m            isSendingRef.current = false;[m
+[32m+[m[32m        }[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const startRecording = async () => {[m
+[32m+[m[32m        try {[m
+[32m+[m[32m            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });[m
+[32m+[m
+[32m+[m[32m            const audioContext = new AudioContext();[m
+[32m+[m[32m            const analyser = audioContext.createAnalyser();[m
+[32m+[m[32m            analyser.fftSize = 128;[m
+[32m+[m[32m            const source = audioContext.createMediaStreamSource(stream);[m
+[32m+[m[32m            source.connect(analyser);[m
+[32m+[m[32m            audioContextRef.current = audioContext;[m
+[32m+[m[32m            analyserRef.current = analyser;[m
+[32m+[m
+[32m+[m[32m            const BAR_COUNT = 32;[m
+[32m+[m[32m            const dataArray = new Uint8Array(analyser.frequencyBinCount);[m
+[32m+[m[32m            let smoothed = Array(BAR_COUNT).fill(0.08);[m
+[32m+[m[32m            const animate = () => {[m
+[32m+[m[32m                analyser.getByteFrequencyData(dataArray);[m
+[32m+[m[32m                smoothed = smoothed.map((curr, i) => {[m
+[32m+[m[32m                    const index = Math.floor(i * dataArray.length / BAR_COUNT);[m
+[32m+[m[32m                    const target = Math.max(0.08, dataArray[index] / 255);[m
+[32m+[m[32m                    return curr + (target - curr) * 0.25;[m
+[32m+[m[32m                });[m
+[32m+[m[32m                setWaveformBars([...smoothed]);[m
+[32m+[m[32m                animationFrameRef.current = requestAnimationFrame(animate);[m
+[32m+[m[32m            };[m
+[32m+[m[32m            animate();[m
+[32m+[m
+[32m+[m[32m            setRecordingTime(0);[m
+[32m+[m[32m            recordingTimerRef.current = setInterval(() => {[m
+[32m+[m[32m                setRecordingTime(prev => {[m
+[32m+[m[32m                    if (prev + 1 >= 35) {[m
+[32m+[m[32m                        setTimeout(() => {[m
+[32m+[m[32m                            stopRecording();[m
+[32m+[m[32m                        }, 50);[m
+[32m+[m[32m                        return 35;[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                    return prev + 1;[m
+[32m+[m[32m                });[m
+[32m+[m[32m            }, 1000);[m
+[32m+[m
+[32m+[m[32m            const mediaRecorder = new MediaRecorder(stream);[m
+[32m+[m[32m            mediaRecorderRef.current = mediaRecorder;[m
+[32m+[m[32m            audioChunksRef.current = [];[m
+[32m+[m[32m            cancelRecordingRef.current = false;[m
+[32m+[m
+[32m+[m[32m            mediaRecorder.ondataavailable = (event) => {[m
+[32m+[m[32m                if (event.data.size > 0) {[m
+[32m+[m[32m                    audioChunksRef.current.push(event.data);[m
+[32m+[m[32m                }[m
+[32m+[m[32m            };[m
+[32m+[m
+[32m+[m[32m            mediaRecorder.onstop = async () => {[m
+[32m+[m[32m                if (!cancelRecordingRef.current) {[m
+[32m+[m[32m                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });[m
+[32m+[m[32m                    await sendAudioToN8N(audioBlob);[m
+[32m+[m[32m                }[m
+[32m+[m[32m                stream.getTracks().forEach(track => track.stop());[m
+[32m+[m[32m            };[m
+[32m+[m
+[32m+[m[32m            mediaRecorder.start();[m
+[32m+[m[32m            setIsRecording(true);[m
+[32m+[m[32m        } catch (error: any) {[m
+[32m+[m[32m            console.error("Error al acceder al micrófono:", error);[m
+[32m+[m
+[32m+[m[32m            let errorMessage = "No pudimos acceder al micrófono. Por favor verifica tus permisos.";[m
+[32m+[m[32m            if (error.name === "NotFoundError" || error.message?.includes("Requested device not found")) {[m
+[32m+[m[32m                errorMessage = "Lo siento, no detectamos ningún micrófono conectado. Por favor asegúrate de tener uno antes de grabar audios.";[m
+[32m+[m[32m            } else if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {[m
+[32m+[m[32m                errorMessage = "Parece que el navegador ha bloqueado el acceso al micrófono. Por favor, permite el acceso en la configuración de la página.";[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            setMessages(prev => [...prev, {[m
+[32m+[m[32m                id: Date.now().toString(),[m
+[32m+[m[32m                role: 'bot',[m
+[32m+[m[32m                text: errorMessage[m
+[32m+[m[32m            }]);[m
+[32m+[m[32m        }[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const stopRecording = () => {[m
+[32m+[m[32m        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {[m
+[32m+[m[32m            mediaRecorderRef.current.stop();[m
+[32m+[m[32m            setIsRecording(false);[m
+[32m+[m[32m            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);[m
+[32m+[m[32m            if (audioContextRef.current) audioContextRef.current.close();[m
+[32m+[m[32m            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);[m
+[32m+[m[32m            setWaveformBars(Array(32).fill(0.08));[m
+[32m+[m[32m            setRecordingTime(0);[m
+[32m+[m[32m        }[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const cancelRecording = () => {[m
+[32m+[m[32m        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {[m
+[32m+[m[32m            cancelRecordingRef.current = true;[m
+[32m+[m[32m            mediaRecorderRef.current.stop();[m
+[32m+[m[32m            setIsRecording(false);[m
+[32m+[m[32m            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);[m
+[32m+[m[32m            if (audioContextRef.current) audioContextRef.current.close();[m
+[32m+[m[32m            if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);[m
+[32m+[m[32m            setWaveformBars(Array(32).fill(0.08));[m
+[32m+[m[32m            setRecordingTime(0);[m
+[32m+[m[32m        }[m
+[32m+[m[32m    };[m
+[32m+[m
+[32m+[m[32m    const sendBatchedMessages = async (messagesToSend: Message[]) => {[m
+[32m+[m[32m        if (messagesToSend.length === 0 || isLoading || isSendingRef.current) return;[m
+[32m+[m
+[32m+[m[32m        if (!sessionId) return;[m
+[32m+[m
+[32m+[m[32m        isSendingRef.current = true;[m
+[32m+[m[32m        setIsLoading(true);[m
+[32m+[m
+[32m+[m[32m        try {[m
+[32m+[m[32m            const combinedMessage = messagesToSend.map((m) => m.text).join("\n\n");[m
+[32m+[m
+[32m+[m[32m            const response = await fetch([m
+[32m+[m[32m                "https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14",[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    method: "POST",[m
+[32m+[m[32m                    headers: { "Content-Type": "application/json" },[m
+[32m+[m[32m                    body: JSON.stringify({[m
+[32m+[m[32m                        chatInput: combinedMessage,[m
+[32m+[m[32m                        sessionId,[m
+[32m+[m[32m                        userAgent: navigator.userAgent,[m
+[32m+[m[32m                    }),[m
+[32m+[m[32m                }[m
+[32m+[m[32m            );[m
+[32m+[m
+[32m+[m[32m            if (!response.ok) throw new Error("Error de conexión");[m
+[32m+[m
+[32m+[m[32m            const responseText = await response.text();[m
+[32m+[m[32m            if (!responseText) {[m
+[32m+[m[32m                console.warn("Respuesta vacía del webhook. Es posible que el flujo esté demorando o el nodo Respond To Webhook no se haya ejecutado.");[m
+[32m+[m[32m                return setMessages((prev) => [[m
+[32m+[m[32m                    ...prev,[m
+[32m+[m[32m                    { id: (Date.now() + 1).toString(), role: "bot", text: "Procesando... (El servidor recibió el mensaje pero no ha respondido con texto)." },[m
+[32m+[m[32m                ]);[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            let botText = "Disculpa, no pude procesar eso.";[m
+[32m+[m[32m            let data: any;[m
+[32m+[m
+[32m+[m[32m            try {[m
+[32m+[m[32m                data = JSON.parse(responseText);[m
+[32m+[m[32m            } catch (e) {[m
+[32m+[m[32m                console.error('Error al parsear JSON:', responseText);[m
+[32m+[m[32m                return setMessages((prev) => [[m
+[32m+[m[32m                    ...prev,[m
+[32m+[m[32m                    { id: (Date.now() + 1).toString(), role: "bot", text: responseText }[m
+[32m+[m[32m                ]);[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            if (data.response) {[m
+[32m+[m[32m                botText = data.response;[m
+[32m+[m[32m            } else if (data.output) {[m
+[32m+[m[32m                botText = data.output;[m
+[32m+[m[32m            } else if (typeof data === 'string') {[m
+[32m+[m[32m                botText = data;[m
+[32m+[m[32m            } else if (Array.isArray(data) && data[0]?.output) {[m
+[32m+[m[32m                botText = data[0].output;[m
+[32m+[m[32m            } else if (data.text) {[m
+[32m+[m[32m                botText = data.text;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            setMessages((prev) => [[m
+[32m+[m[32m                ...prev,[m
+[32m+[m[32m                { id: (Date.now() + 1).toString(), role: "bot", text: botText },[m
+[32m+[m[32m            ]);[m
+[32m+[m[32m        } catch (error) {[m
+[32m+[m[32m            console.error(error);[m
+[32m+[m[32m            setMessages((prev) => [[m
+[32m+[m[32m                ...prev,[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    id: Date.now().toString(),[m
+[32m+[m[32m                    role: "bot",[m
+[32m+[m[32m                    text: "Lo siento, hubo un problema al conectar. Por favor intenta de nuevo.",[m
+[32m+[m[32m                },[m
+[32m+[m[32m            ]);[m
+[32m+[m[32m        } finally {[m
+[32m+[m[32m            setIsLoading(false);[m
+[32m+[m[32m            isSendingRef.current = false;[m
+[32m+[m[32m        }[m
+     };[m
+ [m
+[31m-    const handleSendMessage = (e?: React.FormEvent) => {[m
+[32m+[m[32m    const handleSendMessage = async (e?: React.FormEvent) => {[m
+         if (e) e.preventDefault();[m
+[31m-        if (!inputValue.trim() || isLoading || isSendingRef.current) return;[m
+[31m-        const msg: Message = { id: Date.now().toString(), role: "user", text: inputValue.trim() };[m
+[32m+[m
+[32m+[m[32m        if (isLoading || isSendingRef.current) return;[m
+[32m+[m
+[32m+[m[32m        if (pendingImage) {[m
+[32m+[m[32m            await sendImageToN8N(pendingImage, inputValue.trim());[m
+[32m+[m[32m            return;[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        if (!inputValue.trim()) return;[m
+[32m+[m
+[32m+[m[32m        const userText = inputValue.trim();[m
+         setInputValue("");[m
+[31m-        setMessages((p) => [...p, msg]);[m
+[31m-        setPendingMessages((p) => [...p, msg]);[m
+[31m-        if (timeoutRef.current) clearTimeout(timeoutRef.current);[m
+[32m+[m
+[32m+[m[32m        const userMsg: Message = {[m
+[32m+[m[32m            id: Date.now().toString(),[m
+[32m+[m[32m            role: "user",[m
+[32m+[m[32m            text: userText,[m
+[32m+[m[32m        };[m
+[32m+[m
+[32m+[m[32m        setMessages(prev => [...prev, userMsg]);[m
+[32m+[m
+[32m+[m[32m        setPendingMessages(prev => [...prev, userMsg]);[m
+[32m+[m
+[32m+[m[32m        if (timeoutRef.current) {[m
+[32m+[m[32m            clearTimeout(timeoutRef.current);[m
+[32m+[m[32m        }[m
+[32m+[m
+         timeoutRef.current = setTimeout(() => {[m
+[31m-            setPendingMessages((cur) => { if (cur.length) sendBatchedMessages(cur); return []; });[m
+[31m-        }, 500);[m
+[32m+[m[32m            setPendingMessages(currentPending => {[m
+[32m+[m[32m                if (currentPending.length > 0) {[m
+[32m+[m[32m                    sendBatchedMessages(currentPending);[m
+[32m+[m[32m                }[m
+[32m+[m[32m                return [];[m
+[32m+[m[32m            });[m
+[32m+[m[32m        }, BATCH_TIMEOUT);[m
+     };[m
+ [m
+     return ([m
+         <div className="fixed bottom-6 right-4 sm:right-6 z-[60] flex flex-col items-end gap-4">[m
+             {!isOpen && ([m
+[31m-                <div className={`absolute bottom-20 right-0 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-100 whitespace-nowrap transition-all duration-500 transform ${showTooltip ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>[m
+[31m-                    <div className="text-gray-700 font-medium text-sm">👋 ¿Necesitas ayuda con algo?</div>[m
+[31m-                    <div className="absolute -bottom-2 right-6 w-4 h-4 bg-white transform rotate-45 border-r border-b border-gray-100" />[m
+[32m+[m[32m                <div[m
+[32m+[m[32m                    className={`absolute bottom-20 right-0 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-100 whitespace-nowrap transition-all duration-500 transform ${showTooltip[m
+[32m+[m[32m                        ? "opacity-100 translate-y-0"[m
+[32m+[m[32m                        : "opacity-0 translate-y-4 pointer-events-none"[m
+[32m+[m[32m                        }`}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                    <div className="text-gray-700 font-medium text-sm">[m
+[32m+[m[32m                        👋 ¿Necesitas ayuda con algo?[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <div className="absolute -bottom-2 right-6 w-4 h-4 bg-white transform rotate-45 border-r border-b border-gray-100"></div>[m
+                 </div>[m
+             )}[m
+ [m
+             {isOpen && ([m
+[31m-                <div className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 flex flex-col" style={{ maxHeight: "600px", height: "500px" }}>[m
+[32m+[m[32m                <div[m
+[32m+[m[32m                    className="mb-2 w-[calc(100vw-2rem)] sm:w-80 md:w-96 bg-white rounded-lg shadow-2xl border border-gray-100 origin-bottom-right flex flex-col relative"[m
+[32m+[m[32m                    style={{ maxHeight: '600px', height: '500px' }}[m
+[32m+[m[32m                    onDragEnter={handleDragEnter}[m
+[32m+[m[32m                    onDragLeave={handleDragLeave}[m
+[32m+[m[32m                    onDragOver={handleDragOver}[m
+[32m+[m[32m                    onDrop={handleDrop}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                    {isDraggingOver && ([m
+[32m+[m[32m                        <div className="absolute inset-0 z-10 rounded-lg bg-[#1B8BCC]/10 border-2 border-dashed border-[#1B8BCC] flex flex-col items-center justify-center gap-2 pointer-events-none">[m
+[32m+[m[32m                            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#1B8BCC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">[m
+[32m+[m[32m                                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />[m
+[32m+[m[32m                                <circle cx="9" cy="9" r="2" />[m
+[32m+[m[32m                                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />[m
+[32m+[m[32m                            </svg>[m
+[32m+[m[32m                            <span className="text-[#1B8BCC] font-medium text-sm">Suelta la imagen aquí</span>[m
+[32m+[m[32m                        </div>[m
+[32m+[m[32m                    )}[m
+[32m+[m
+                     <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0 rounded-t-lg">[m
+                         <div className="flex items-center gap-2">[m
+[31m-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>[m
+[31m-                            <div>[m
+[31m-                                <span className="font-semibold text-lg block leading-tight">Asistente Virtual</span>[m
+[31m-                                <span className="text-xs text-white/60 font-mono">{apiKey}</span>[m
+[31m-                            </div>[m
+[32m+[m[32m                            <svg[m
+[32m+[m[32m                                xmlns="http://www.w3.org/2000/svg"[m
+[32m+[m[32m                                width="24"[m
+[32m+[m[32m                                height="24"[m
+[32m+[m[32m                                viewBox="0 0 24 24"[m
+[32m+[m[32m                                fill="none"[m
+[32m+[m[32m                                stroke="currentColor"[m
+[32m+[m[32m                                strokeWidth="2"[m
+[32m+[m[32m                                strokeLinecap="round"[m
+[32m+[m[32m                                strokeLinejoin="round"[m
+[32m+[m[32m                            >[m
+[32m+[m[32m                                <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />[m
+[32m+[m[32m                            </svg>[m
+[32m+[m[32m                            <span className="font-semibold text-lg">Asistente Virtual</span>[m
+                         </div>[m
+[31m-                        <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 rounded-full p-1 transition-colors" type="button">[m
+[31m-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>[m
+[32m+[m[32m                        <button[m
+[32m+[m[32m                            onClick={() => setIsOpen(false)}[m
+[32m+[m[32m                            className="hover:bg-white/20 rounded-full p-1 transition-colors"[m
+[32m+[m[32m                            aria-label="Cerrar chat"[m
+[32m+[m[32m                            type="button"[m
+[32m+[m[32m                        >[m
+[32m+[m[32m                            <svg[m
+[32m+[m[32m                                xmlns="http://www.w3.org/2000/svg"[m
+[32m+[m[32m                                width="20"[m
+[32m+[m[32m                                height="20"[m
+[32m+[m[32m                                viewBox="0 0 24 24"[m
+[32m+[m[32m                                fill="none"[m
+[32m+[m[32m                                stroke="currentColor"[m
+[32m+[m[32m                                strokeWidth="2"[m
+[32m+[m[32m                                strokeLinecap="round"[m
+[32m+[m[32m                                strokeLinejoin="round"[m
+[32m+[m[32m                            >[m
+[32m+[m[32m                                <path d="M18 6 6 18" />[m
+[32m+[m[32m                                <path d="m6 6 12 12" />[m
+[32m+[m[32m                            </svg>[m
+                         </button>[m
+                     </div>[m
+ [m
+                     <div className="flex flex-col h-full bg-gray-50 overflow-hidden rounded-b-lg">[m
+                         <div className="flex-1 overflow-y-auto p-4 space-y-4">[m
+                             {messages.map((msg) => ([m
+[31m-                                <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>[m
+[31m-                                    <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === "user" ? "bg-[#1B8BCC] text-white rounded-br-none" : "bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm"}`}>[m
+[31m-                                        {msg.text}[m
+[32m+[m[32m                                <div[m
+[32m+[m[32m                                    key={msg.id}[m
+[32m+[m[32m                                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"[m
+[32m+[m[32m                                        }`}[m
+[32m+[m[32m                                >[m
+[32m+[m[32m                                    <div[m
+[32m+[m[32m                                        className={`max-w-[80%] rounded-2xl text-sm overflow-hidden ${msg.role === 'user'[m
+[32m+[m[32m                                            ? 'bg-[#1B8BCC] text-white rounded-br-none'[m
+[32m+[m[32m                                            : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'[m
+[32m+[m[32m                                            } ${msg.imageUrl ? 'p-0' : msg.audioUrl ? 'p-1.5' : 'p-3'}`}[m
+[32m+[m[32m                                    >[m
+[32m+[m[32m                                        {msg.imageUrl ? ([m
+[32m+[m[32m                                            <>[m
+[32m+[m[32m                                                <img src={msg.imageUrl} alt="Imagen adjunta" className="max-w-full block" />[m
+[32m+[m[32m                                                {msg.text && <p className="px-3 py-2 text-sm">{msg.text}</p>}[m
+[32m+[m[32m                                            </>[m
+[32m+[m[32m                                        ) : msg.audioUrl ? ([m
+[32m+[m[32m                                            <AudioMessage audioUrl={msg.audioUrl} isUser={msg.role === 'user'} />[m
+[32m+[m[32m                                        ) : ([m
+[32m+[m[32m                                            msg.text[m
+[32m+[m[32m                                        )}[m
+                                     </div>[m
+                                 </div>[m
+                             ))}[m
+                             {isLoading && ([m
+                                 <div className="flex justify-start">[m
+                                     <div className="bg-white p-3 rounded-2xl rounded-bl-none border border-gray-200 shadow-sm flex items-center gap-1">[m
+[31m-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />[m
+[31m-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-.3s]" />[m
+[31m-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-.5s]" />[m
+[32m+[m[32m                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>[m
+[32m+[m[32m                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-.3s]"></div>[m
+[32m+[m[32m                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-.5s]"></div>[m
+                                     </div>[m
+                                 </div>[m
+                             )}[m
+                             <div ref={messagesEndRef} />[m
+                         </div>[m
+[31m-                        <div className="p-3 bg-white border-t border-gray-200">[m
+[31m-                            <form onSubmit={handleSendMessage} className="flex gap-2">[m
+[31m-                                <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Escribe tu mensaje..." className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800" />[m
+[31m-                                <button type="submit" disabled={isLoading || !inputValue.trim()} className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">[m
+[31m-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>[m
+[31m-                                </button>[m
+[31m-                            </form>[m
+[32m+[m
+[32m+[m[32m                        <div className="px-3 pt-2 pb-3 bg-white border-t border-gray-200">[m
+[32m+[m[32m                            {pendingImageUrl && !isRecording && ([m
+[32m+[m[32m                                <div className="mb-2 relative inline-block">[m
+[32m+[m[32m                                    <img src={pendingImageUrl} alt="Preview" className="h-16 w-16 object-cover rounded-lg border border-gray-200" />[m
+[32m+[m[32m                                    <button[m
+[32m+[m[32m                                        type="button"[m
+[32m+[m[32m                                        onClick={clearPendingImage}[m
+[32m+[m[32m                                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-600 text-white rounded-full flex items-center justify-center text-xs font-bold leading-none"[m
+[32m+[m[32m                                    >×</button>[m
+[32m+[m[32m                                </div>[m
+[32m+[m[32m                            )}[m
+[32m+[m[32m                            {/* Input */}[m
+[32m+[m[32m                            <div className="p-3 bg-white border-t border-gray-200">[m
+[32m+[m[32m                                <form onSubmit={handleSendMessage} className="flex gap-2 items-center">[m
+[32m+[m[32m                                    <input[m
+[32m+[m[32m                                        ref={fileInputRef}[m
+[32m+[m[32m                                        type="file"[m
+[32m+[m[32m                                        accept="image/*"[m
+[32m+[m[32m                                        className="hidden"[m
+[32m+[m[32m                                        onChange={handleImageSelect}[m
+[32m+[m[32m                                    />[m
+[32m+[m[32m                                    {!isRecording && ([m
+[32m+[m[32m                                        <button[m
+[32m+[m[32m                                            type="button"[m
+[32m+[m[32m                                            onClick={() => fileInputRef.current?.click()}[m
+[32m+[m[32m                                            className="p-2 text-gray-400 hover:text-[#1B8BCC] transition-colors shrink-0"[m
+[32m+[m[32m                                            aria-label="Adjuntar imagen"[m
+[32m+[m[32m                                        >[m
+[32m+[m[32m                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">[m
+[32m+[m[32m                                                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />[m
+[32m+[m[32m                                            </svg>[m
+[32m+[m[32m                                        </button>[m
+[32m+[m[32m                                    )}[m
+[32m+[m[32m                                    {isRecording ? ([m
+[32m+[m[32m                                        <div className="flex items-center gap-2 flex-1 px-1">[m
+[32m+[m[32m                                            <button[m
+[32m+[m[32m                                                type="button"[m
+[32m+[m[32m                                                onClick={cancelRecording}[m
+[32m+[m[32m                                                className="p-1 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors shrink-0"[m
+[32m+[m[32m                                                title="Cancelar grabación"[m
+[32m+[m[32m                                            >[m
+[32m+[m[32m                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">[m
+[32m+[m[32m                                                    <polyline points="3 6 5 6 21 6"></polyline>[m
+[32m+[m[32m                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>[m
+[32m+[m[32m                                                    <line x1="10" y1="11" x2="10" y2="17"></line>[m
+[32m+[m[32m                                                    <line x1="14" y1="11" x2="14" y2="17"></line>[m
+[32m+[m[32m                                                </svg>[m
+[32m+[m[32m                                            </button>[m
+[32m+[m[32m                                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />[m
+[32m+[m[32m                                            <div className="flex items-center justify-between flex-1 h-8">[m
+[32m+[m[32m                                                {waveformBars.map((scale, i) => ([m
+[32m+[m[32m                                                    <div[m
+[32m+[m[32m                                                        key={i}[m
+[32m+[m[32m                                                        className="w-[2px] h-full bg-red-400 rounded-full"[m
+[32m+[m[32m                                                        style={{ transform: `scaleY(${scale})`, transformOrigin: 'center' }}[m
+[32m+[m[32m                                                    />[m
+[32m+[m[32m                                                ))}[m
+[32m+[m[32m                                            </div>[m
+[32m+[m[32m                                            <span className="text-red-400 text-xs font-mono shrink-0 tabular-nums">[m
+[32m+[m[32m                                                {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}[m
+[32m+[m[32m                                            </span>[m
+[32m+[m[32m                                        </div>[m
+[32m+[m[32m                                    ) : ([m
+[32m+[m[32m                                        <input[m
+[32m+[m[32m                                            type="text"[m
+[32m+[m[32m                                            value={inputValue}[m
+[32m+[m[32m                                            onChange={(e) => setInputValue(e.target.value)}[m
+[32m+[m[32m                                            placeholder="Escribe tu mensaje..."[m
+[32m+[m[32m                                            className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"[m
+[32m+[m[32m                                        />[m
+[32m+[m[32m                                    )}[m
+[32m+[m[32m                                    {!isRecording && (inputValue.trim() || pendingImage) ? ([m
+[32m+[m[32m                                        <button[m
+[32m+[m[32m                                            type="submit"[m
+[32m+[m[32m                                            disabled={isLoading}[m
+[32m+[m[32m                                            className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"[m
+[32m+[m[32m                                            aria-label="Enviar mensaje"[m
+[32m+[m[32m                                        >[m
+[32m+[m[32m                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">[m
+[32m+[m[32m                                                <path d="m22 2-7 20-4-9-9-4Z" />[m
+[32m+[m[32m                                                <path d="M22 2 11 13" />[m
+[32m+[m[32m                                            </svg>[m
+[32m+[m[32m                                        </button>[m
+[32m+[m[32m                                    ) : ([m
+[32m+[m[32m                                        <button[m
+[32m+[m[32m                                            type="button"[m
+[32m+[m[32m                                            onClick={isRecording ? stopRecording : startRecording}[m
+[32m+[m[32m                                            disabled={isLoading}[m
+[32m+[m[32m                                            className={`p-2.5 rounded-full transition-colors shrink-0 flex items-center justify-center ${isRecording[m
+[32m+[m[32m                                                ? 'bg-red-500 text-white'[m
+[32m+[m[32m                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-[#1B8BCC]'[m
+[32m+[m[32m                                                }`}[m
+[32m+[m[32m                                            title={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}[m
+[32m+[m[32m                                            aria-label={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}[m
+[32m+[m[32m                                        >[m
+[32m+[m[32m                                            {isRecording ? ([m
+[32m+[m[32m                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">[m
+[32m+[m[32m                                                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />[m
+[32m+[m[32m                                                </svg>[m
+[32m+[m[32m                                            ) : ([m
+[32m+[m[32m                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">[m
+[32m+[m[32m                                                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />[m
+[32m+[m[32m                                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />[m
+[32m+[m[32m                                                    <line x1="12" x2="12" y1="19" y2="22" />[m
+[32m+[m[32m                                                </svg>[m
+[32m+[m[32m                                            )}[m
+[32m+[m[32m                                        </button>[m
+[32m+[m[32m                                    )}[m
+[32m+[m[32m                                </form>[m
+[32m+[m[32m                            </div>[m
+                         </div>[m
+                     </div>[m
+                 </div>[m
+             )}[m
+ [m
+             {!isOpen && ([m
+[31m-                <button onClick={() => setIsOpen(!isOpen)} className="bg-[#1B8BCC] text-white p-4 rounded-full shadow-lg hover:bg-[#1676ad] transition-all hover:scale-110 active:scale-95 flex items-center justify-center" style={{ width: "60px", height: "60px" }}>[m
+[31m-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                    onClick={toggleOpen}[m
+[32m+[m[32m                    className="bg-[#1B8BCC] text-white p-4 rounded-full shadow-lg hover:bg-[#1676ad] transition-all hover:scale-110 active:scale-95 flex items-center justify-center animate-bounce-subtle"[m
+[32m+[m[32m                    aria-label="Abrir asistente"[m
+[32m+[m[32m                    style={{ width: "60px", height: "60px" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                    <svg[m
+[32m+[m[32m                        xmlns="http://www.w3.org/2000/svg"[m
+[32m+[m[32m                        width="32"[m
+[32m+[m[32m                        height="32"[m
+[32m+[m[32m                        viewBox="0 0 24 24"[m
+[32m+[m[32m                        fill="none"[m
+[32m+[m[32m                        stroke="currentColor"[m
+[32m+[m[32m                        strokeWidth="2"[m
+[32m+[m[32m                        strokeLinecap="round"[m
+[32m+[m[32m                        strokeLinejoin="round"[m
+[32m+[m[32m                    >[m
+[32m+[m[32m                        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />[m
+[32m+[m[32m                    </svg>[m
+                 </button>[m
+             )}[m
+         </div>[m
+[1mdiff --git a/errors.txt b/errors.txt[m
+[1mnew file mode 100644[m
+[1mindex 0000000..b88eac6[m
+Binary files /dev/null and b/errors.txt differ

@@ -1,0 +1,5 @@
+﻿components/ChatWidget.tsx(698,6): error TS17008: JSX element 'div' has no corresponding closing tag.
+components/ChatWidget.tsx(924,14): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+components/ChatWidget.tsx(949,10): error TS1005: '}' expected.
+components/ChatWidget.tsx(950,1): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+components/ChatWidget.tsx(950,2): error TS1005: '</' expected.

@@ -141,8 +141,7 @@ function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean 
 
             <button
                 onClick={togglePlay}
-                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isUser ? 'bg-white/20 hover:bg-white/35' : 'bg-[#1B8BCC]/15 hover:bg-[#1B8BCC]/25'
-                    }`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isUser ? 'bg-white/20 hover:bg-white/35' : 'bg-[#1B8BCC]/15 hover:bg-[#1B8BCC]/25'}`}
             >
                 {isPlaying ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -179,7 +178,6 @@ function AudioMessage({ audioUrl, isUser }: { audioUrl: string; isUser: boolean 
     );
 }
 
-
 const compressImage = async (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -195,15 +193,9 @@ const compressImage = async (file: File): Promise<File> => {
                 let height = img.height;
 
                 if (width > height) {
-                    if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
-                    }
+                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
                 } else {
-                    if (height > MAX_HEIGHT) {
-                        width *= MAX_HEIGHT / height;
-                        height = MAX_HEIGHT;
-                    }
+                    if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
                 }
 
                 cvs.width = width;
@@ -225,9 +217,13 @@ const compressImage = async (file: File): Promise<File> => {
 };
 
 export default function ChatWidget({
+    apiKey = "biz_compustore",
+    webhookUrl = "https://n8n.mediclick.us/webhook/7a795449-952f-488c-a668-6716d3f37318",
     isOpen: externalIsOpen,
     setIsOpen: externalSetIsOpen,
 }: {
+    apiKey?: string;
+    webhookUrl?: string;
     isOpen?: boolean;
     setIsOpen?: (value: boolean) => void;
 } = {}) {
@@ -244,11 +240,7 @@ export default function ChatWidget({
     }, []);
 
     const [messages, setMessages] = useState<Message[]>([
-        {
-            id: "1",
-            role: "bot",
-            text: "¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?",
-        },
+        { id: "1", role: "bot", text: "¡Hola! Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?" },
     ]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -277,15 +269,11 @@ export default function ChatWidget({
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const toggleOpen = () => setIsOpen(!isOpen);
-
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+    useEffect(() => { scrollToBottom(); }, [messages]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -361,11 +349,12 @@ export default function ChatWidget({
             const formData = new FormData();
             formData.append('image', compressedFile, compressedFile.name);
             formData.append('sessionId', sessionId);
+            formData.append('apiKey', apiKey);
             formData.append('userAgent', navigator.userAgent);
             formData.append('type', 'image');
             if (caption) formData.append('caption', caption);
 
-            const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {
+            const response = await fetch(webhookUrl, {
                 method: 'POST',
                 body: formData
             });
@@ -386,7 +375,7 @@ export default function ChatWidget({
 
             setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'bot', text: botText }]);
         } catch (error) {
-            console.error(error);
+            console.warn('[ChatWidget] sendImageToN8N error:', error instanceof Error ? error.message : error);
             setMessages(prev => [...prev, { id: Date.now().toString(), role: 'bot', text: 'Lo siento, hubo un problema al enviar la imagen.' }]);
         } finally {
             setIsLoading(false);
@@ -407,10 +396,11 @@ export default function ChatWidget({
             const formData = new FormData();
             formData.append('audio', audioBlob, 'audio.webm');
             formData.append('sessionId', sessionId);
+            formData.append('apiKey', apiKey);
             formData.append('userAgent', navigator.userAgent);
             formData.append('type', 'audio');
 
-            const response = await fetch('https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14', {
+            const response = await fetch(webhookUrl, {
                 method: 'POST',
                 body: formData
             });
@@ -421,30 +411,19 @@ export default function ChatWidget({
             if (!responseText) throw new Error('No se recibió respuesta del asistente.');
 
             let botText = "Disculpa, no pude procesar eso.";
-            let data;
             try {
-                data = JSON.parse(responseText);
+                const data = JSON.parse(responseText);
                 if (data.response) botText = data.response;
                 else if (data.output) botText = data.output;
                 else if (typeof data === 'string') botText = data;
                 else if (Array.isArray(data) && data[0]?.output) botText = data[0].output;
                 else if (data.text) botText = data.text;
-            } catch (e) {
-                botText = responseText;
-            }
+            } catch { botText = responseText; }
 
-            setMessages(prev => [...prev, {
-                id: (Date.now() + 1).toString(),
-                role: 'bot',
-                text: botText
-            }]);
+            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'bot', text: botText }]);
         } catch (error) {
-            console.error(error);
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'bot',
-                text: 'Lo siento, hubo un problema al enviar el audio. Por favor intenta de nuevo.'
-            }]);
+            console.warn('[ChatWidget] sendAudioToN8N error:', error instanceof Error ? error.message : error);
+            setMessages(prev => [...prev, { id: Date.now().toString(), role: 'bot', text: 'Lo siento, hubo un problema al enviar el audio. Por favor intenta de nuevo.' }]);
         } finally {
             setIsLoading(false);
             isSendingRef.current = false;
@@ -482,9 +461,7 @@ export default function ChatWidget({
             recordingTimerRef.current = setInterval(() => {
                 setRecordingTime(prev => {
                     if (prev + 1 >= 35) {
-                        setTimeout(() => {
-                            stopRecording();
-                        }, 50);
+                        setTimeout(() => stopRecording(), 50);
                         return 35;
                     }
                     return prev + 1;
@@ -497,9 +474,7 @@ export default function ChatWidget({
             cancelRecordingRef.current = false;
 
             mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunksRef.current.push(event.data);
-                }
+                if (event.data.size > 0) audioChunksRef.current.push(event.data);
             };
 
             mediaRecorder.onstop = async () => {
@@ -522,11 +497,7 @@ export default function ChatWidget({
                 errorMessage = "Parece que el navegador ha bloqueado el acceso al micrófono. Por favor, permite el acceso en la configuración de la página.";
             }
 
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'bot',
-                text: errorMessage
-            }]);
+            setMessages(prev => [...prev, { id: Date.now().toString(), role: 'bot', text: errorMessage }]);
         }
     };
 
@@ -556,9 +527,7 @@ export default function ChatWidget({
     };
 
     const sendBatchedMessages = async (messagesToSend: Message[]) => {
-        if (messagesToSend.length === 0 || isLoading || isSendingRef.current) return;
-
-        if (!sessionId) return;
+        if (messagesToSend.length === 0 || isLoading || isSendingRef.current || !sessionId) return;
 
         isSendingRef.current = true;
         setIsLoading(true);
@@ -566,24 +535,21 @@ export default function ChatWidget({
         try {
             const combinedMessage = messagesToSend.map((m) => m.text).join("\n\n");
 
-            const response = await fetch(
-                "https://n8n.mediclick.us/webhook/927f706e-189f-45fe-934a-fd7499590e14",
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        chatInput: combinedMessage,
-                        sessionId,
-                        userAgent: navigator.userAgent,
-                    }),
-                }
-            );
+            const response = await fetch(webhookUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    chatInput: combinedMessage,
+                    sessionId,
+                    apiKey,
+                    userAgent: navigator.userAgent,
+                }),
+            });
 
             if (!response.ok) throw new Error("Error de conexión");
 
             const responseText = await response.text();
             if (!responseText) {
-                console.warn("Respuesta vacía del webhook. Es posible que el flujo esté demorando o el nodo Respond To Webhook no se haya ejecutado.");
                 return setMessages((prev) => [
                     ...prev,
                     { id: (Date.now() + 1).toString(), role: "bot", text: "Procesando... (El servidor recibió el mensaje pero no ha respondido con texto)." },
@@ -595,39 +561,28 @@ export default function ChatWidget({
 
             try {
                 data = JSON.parse(responseText);
-            } catch (e) {
-                console.error('Error al parsear JSON:', responseText);
+            } catch {
                 return setMessages((prev) => [
                     ...prev,
                     { id: (Date.now() + 1).toString(), role: "bot", text: responseText }
                 ]);
             }
 
-            if (data.response) {
-                botText = data.response;
-            } else if (data.output) {
-                botText = data.output;
-            } else if (typeof data === 'string') {
-                botText = data;
-            } else if (Array.isArray(data) && data[0]?.output) {
-                botText = data[0].output;
-            } else if (data.text) {
-                botText = data.text;
-            }
+            if (data.response) botText = data.response;
+            else if (data.output) botText = data.output;
+            else if (typeof data === 'string') botText = data;
+            else if (Array.isArray(data) && data[0]?.output) botText = data[0].output;
+            else if (data.text) botText = data.text;
 
             setMessages((prev) => [
                 ...prev,
                 { id: (Date.now() + 1).toString(), role: "bot", text: botText },
             ]);
         } catch (error) {
-            console.error(error);
+            console.warn('[ChatWidget] sendBatchedMessages error:', error instanceof Error ? error.message : error);
             setMessages((prev) => [
                 ...prev,
-                {
-                    id: Date.now().toString(),
-                    role: "bot",
-                    text: "Lo siento, hubo un problema al conectar. Por favor intenta de nuevo.",
-                },
+                { id: Date.now().toString(), role: "bot", text: "Lo siento, hubo un problema al conectar. Por favor intenta de nuevo." },
             ]);
         } finally {
             setIsLoading(false);
@@ -637,7 +592,6 @@ export default function ChatWidget({
 
     const handleSendMessage = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-
         if (isLoading || isSendingRef.current) return;
 
         if (pendingImage) {
@@ -650,25 +604,15 @@ export default function ChatWidget({
         const userText = inputValue.trim();
         setInputValue("");
 
-        const userMsg: Message = {
-            id: Date.now().toString(),
-            role: "user",
-            text: userText,
-        };
-
+        const userMsg: Message = { id: Date.now().toString(), role: "user", text: userText };
         setMessages(prev => [...prev, userMsg]);
-
         setPendingMessages(prev => [...prev, userMsg]);
 
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-        }
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
         timeoutRef.current = setTimeout(() => {
             setPendingMessages(currentPending => {
-                if (currentPending.length > 0) {
-                    sendBatchedMessages(currentPending);
-                }
+                if (currentPending.length > 0) sendBatchedMessages(currentPending);
                 return [];
             });
         }, BATCH_TIMEOUT);
@@ -683,9 +627,7 @@ export default function ChatWidget({
                         : "opacity-0 translate-y-4 pointer-events-none"
                         }`}
                 >
-                    <div className="text-gray-700 font-medium text-sm">
-                        👋 ¿Necesitas ayuda con algo?
-                    </div>
+                    <div className="text-gray-700 font-medium text-sm">👋 ¿Necesitas ayuda con algo?</div>
                     <div className="absolute -bottom-2 right-6 w-4 h-4 bg-white transform rotate-45 border-r border-b border-gray-100"></div>
                 </div>
             )}
@@ -710,22 +652,16 @@ export default function ChatWidget({
                         </div>
                     )}
 
+                    {/* Header */}
                     <div className="bg-[#1B8BCC] p-4 flex items-center justify-between text-white shrink-0 rounded-t-lg">
                         <div className="flex items-center gap-2">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                             </svg>
-                            <span className="font-semibold text-lg">Asistente Virtual</span>
+                            <div>
+                                <span className="font-semibold text-lg block leading-tight">Asistente Virtual</span>
+                                <span className="text-xs text-white/60 font-mono">{apiKey}</span>
+                            </div>
                         </div>
                         <button
                             onClick={() => setIsOpen(false)}
@@ -733,31 +669,17 @@ export default function ChatWidget({
                             aria-label="Cerrar chat"
                             type="button"
                         >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <path d="M18 6 6 18" />
-                                <path d="m6 6 12 12" />
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 6 6 18" /><path d="m6 6 12 12" />
                             </svg>
                         </button>
                     </div>
 
                     <div className="flex flex-col h-full bg-gray-50 overflow-hidden rounded-b-lg">
+                        {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {messages.map((msg) => (
-                                <div
-                                    key={msg.id}
-                                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
-                                        }`}
-                                >
+                                <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                                     <div
                                         className={`max-w-[80%] rounded-2xl text-sm overflow-hidden ${msg.role === 'user'
                                             ? 'bg-[#1B8BCC] text-white rounded-br-none'
@@ -789,6 +711,7 @@ export default function ChatWidget({
                             <div ref={messagesEndRef} />
                         </div>
 
+                        {/* Input area */}
                         <div className="px-3 pt-2 pb-3 bg-white border-t border-gray-200">
                             {pendingImageUrl && !isRecording && (
                                 <div className="mb-2 relative inline-block">
@@ -800,105 +723,101 @@ export default function ChatWidget({
                                     >×</button>
                                 </div>
                             )}
-                            {/* Input */}
-                            <div className="p-3 bg-white border-t border-gray-200">
-                                <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={handleImageSelect}
-                                    />
-                                    {!isRecording && (
+                            <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleImageSelect}
+                                />
+                                {!isRecording && (
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="p-2 text-gray-400 hover:text-[#1B8BCC] transition-colors shrink-0"
+                                        aria-label="Adjuntar imagen"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                                        </svg>
+                                    </button>
+                                )}
+                                {isRecording ? (
+                                    <div className="flex items-center gap-2 flex-1 px-1">
                                         <button
                                             type="button"
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="p-2 text-gray-400 hover:text-[#1B8BCC] transition-colors shrink-0"
-                                            aria-label="Adjuntar imagen"
+                                            onClick={cancelRecording}
+                                            className="p-1 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors shrink-0"
+                                            title="Cancelar grabación"
                                         >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                <line x1="14" y1="11" x2="14" y2="17"></line>
                                             </svg>
                                         </button>
-                                    )}
-                                    {isRecording ? (
-                                        <div className="flex items-center gap-2 flex-1 px-1">
-                                            <button
-                                                type="button"
-                                                onClick={cancelRecording}
-                                                className="p-1 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors shrink-0"
-                                                title="Cancelar grabación"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                                                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                                                </svg>
-                                            </button>
-                                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
-                                            <div className="flex items-center justify-between flex-1 h-8">
-                                                {waveformBars.map((scale, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className="w-[2px] h-full bg-red-400 rounded-full"
-                                                        style={{ transform: `scaleY(${scale})`, transformOrigin: 'center' }}
-                                                    />
-                                                ))}
-                                            </div>
-                                            <span className="text-red-400 text-xs font-mono shrink-0 tabular-nums">
-                                                {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}
-                                            </span>
+                                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
+                                        <div className="flex items-center justify-between flex-1 h-8">
+                                            {waveformBars.map((scale, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="w-[2px] h-full bg-red-400 rounded-full"
+                                                    style={{ transform: `scaleY(${scale})`, transformOrigin: 'center' }}
+                                                />
+                                            ))}
                                         </div>
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            value={inputValue}
-                                            onChange={(e) => setInputValue(e.target.value)}
-                                            placeholder="Escribe tu mensaje..."
-                                            className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"
-                                        />
-                                    )}
-                                    {!isRecording && (inputValue.trim() || pendingImage) ? (
-                                        <button
-                                            type="submit"
-                                            disabled={isLoading}
-                                            className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
-                                            aria-label="Enviar mensaje"
-                                        >
+                                        <span className="text-red-400 text-xs font-mono shrink-0 tabular-nums">
+                                            {String(Math.floor(recordingTime / 60)).padStart(2, '0')}:{String(recordingTime % 60).padStart(2, '0')}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={inputValue}
+                                        onChange={(e) => setInputValue(e.target.value)}
+                                        placeholder="Escribe tu mensaje..."
+                                        className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#1B8BCC] focus:ring-1 focus:ring-[#1B8BCC] text-gray-800"
+                                    />
+                                )}
+                                {!isRecording && (inputValue.trim() || pendingImage) ? (
+                                    <button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        className="bg-[#1B8BCC] text-white p-2.5 rounded-full hover:bg-[#1676ad] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                                        aria-label="Enviar mensaje"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" />
+                                        </svg>
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={isRecording ? stopRecording : startRecording}
+                                        disabled={isLoading}
+                                        className={`p-2.5 rounded-full transition-colors shrink-0 flex items-center justify-center ${isRecording
+                                            ? 'bg-red-500 text-white'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-[#1B8BCC]'
+                                            }`}
+                                        title={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
+                                        aria-label={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
+                                    >
+                                        {isRecording ? (
                                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="m22 2-7 20-4-9-9-4Z" />
-                                                <path d="M22 2 11 13" />
+                                                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
                                             </svg>
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={isRecording ? stopRecording : startRecording}
-                                            disabled={isLoading}
-                                            className={`p-2.5 rounded-full transition-colors shrink-0 flex items-center justify-center ${isRecording
-                                                ? 'bg-red-500 text-white'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-[#1B8BCC]'
-                                                }`}
-                                            title={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
-                                            aria-label={isRecording ? 'Detener grabación' : 'Enviar mensaje de voz'}
-                                        >
-                                            {isRecording ? (
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-                                                </svg>
-                                            ) : (
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                                                    <line x1="12" x2="12" y1="19" y2="22" />
-                                                </svg>
-                                            )}
-                                        </button>
-                                    )}
-                                </form>
-                            </div>
+                                        ) : (
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                                <line x1="12" x2="12" y1="19" y2="22" />
+                                            </svg>
+                                        )}
+                                    </button>
+                                )}
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -906,22 +825,12 @@ export default function ChatWidget({
 
             {!isOpen && (
                 <button
-                    onClick={toggleOpen}
+                    onClick={() => setIsOpen(!isOpen)}
                     className="bg-[#1B8BCC] text-white p-4 rounded-full shadow-lg hover:bg-[#1676ad] transition-all hover:scale-110 active:scale-95 flex items-center justify-center animate-bounce-subtle"
                     aria-label="Abrir asistente"
                     style={{ width: "60px", height: "60px" }}
                 >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="32"
-                        height="32"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                     </svg>
                 </button>
